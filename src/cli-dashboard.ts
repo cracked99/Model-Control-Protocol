@@ -323,3 +323,4 @@ refreshDashboard();
 // - Persist session/command history
 // - Parse next steps dynamically from README or a TODO file
 // - Show more detailed rule/component/project info
+ 
