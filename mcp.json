@@ -5,61 +5,168 @@
   "endpoint": "http://localhost:8787/mcp",
   "tools": [
     {
+      "name": "dashboard",
+      "description": "Activates the Agentic Framework dashboard in persistent mode. The dashboard shows real-time framework status, active rules, metrics, and project progress."
+    },
+    {
+      "name": "dashboard-update",
+      "description": "Updates and displays the Agentic Framework dashboard in the chat. Use this tool to get the current project status and display it without leaving the conversation."
+    },
+    {
+      "name": "stop-dashboard",
+      "description": "Stops the Agentic Framework dashboard. Use this when you no longer need the real-time dashboard running in the background."
+    },
+    {
+      "name": "framework",
+      "description": "Legacy tool to run framework commands. Prefer using the direct command tools instead. Supported commands: status, help, load, unload, reload, list, reset, dashboard.",
+      "parameters": {
+        "command": {
+          "type": "string",
+          "description": "The framework command to run (e.g., 'status', 'help', 'load')"
+        },
+        "args": {
+          "type": "array",
+          "description": "Optional arguments for the command. For 'load' and 'unload', specify the rule set ID.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "analyze-project",
+      "description": "Runs the project analyzer to examine codebase, calculate component completion percentages, identify current development phase, and update project state. Set generate_report=true to get a comprehensive report (same as generate-project-report tool).",
+      "parameters": {
+        "generate_report": {
+          "type": "boolean",
+          "description": "Set to true to generate a full detailed report instead of a summary",
+          "default": false
+        }
+      }
+    },
+    {
       "name": "analyzeCode",
-      "description": "Analyzes code for quality issues and suggests improvements",
+      "description": "Analyzes code for quality issues and suggests improvements. Checks for security vulnerabilities, performance issues, maintainability problems, and missing error handling.",
       "parameters": {
         "code": {
           "type": "string",
-          "description": "The code to analyze"
+          "description": "The source code to analyze"
         },
         "language": {
           "type": "string",
-          "description": "The programming language of the code",
+          "description": "The programming language of the code (e.g., 'javascript', 'python', 'typescript')",
           "default": "javascript"
         }
       }
     },
+
     {
-      "name": "framework",
-      "description": "Execute framework commands",
+      "name": "framework-status",
+      "description": "Gets the current status of the Agentic Framework including active rules organized by category, framework state, and metrics. More efficient than using the 'framework' tool with 'status' command."
+    },
+    {
+      "name": "framework-help",
+      "description": "Displays comprehensive help information for all Agentic Framework commands, including usage examples and parameter specifications."
+    },
+    {
+      "name": "load-rule-set",
+      "description": "Loads a specific rule set into the framework. Rule sets control agent behavior for different tasks (e.g., code-quality-development, context-retention).",
       "parameters": {
-        "command": {
+        "ruleSetId": {
           "type": "string",
-          "description": "The framework command to run",
-          "enum": ["status", "help", "load", "unload", "reload", "list", "reset"]
-        },
-        "args": {
+          "description": "ID of the rule set to load (e.g., 'code-quality-development', 'core-agent-behavior', 'rule-prioritization')"
+        }
+      }
+    },
+    {
+      "name": "unload-rule-set",
+      "description": "Unloads a specific rule set from the framework. Use this to remove rules that are no longer needed or to troubleshoot rule conflicts.",
+      "parameters": {
+        "ruleSetId": {
+          "type": "string",
+          "description": "ID of the rule set to unload (e.g., 'code-quality-development', 'core-agent-behavior')"
+        }
+      }
+    },
+    {
+      "name": "reload-rules",
+      "description": "Reloads all active rules in the framework. Use this after making changes to rule definitions or when rule behavior seems inconsistent."
+    },
+    {
+      "name": "list-rule-sets",
+      "description": "Lists all available rule sets that can be loaded into the framework, including their IDs and brief descriptions."
+    },
+    {
+      "name": "reset-framework",
+      "description": "Resets the framework to its default state, reloading core rule sets and clearing temporary data. Use this tool when troubleshooting framework issues."
+    },
+    {
+      "name": "update-project-progress",
+      "description": "Updates progress percentages for project components and tasks. Use this to keep the project state accurate as development progresses.",
+      "parameters": {
+        "components": {
           "type": "array",
+          "description": "Array of component objects to update. Each should have a name and progress percentage.",
           "items": {
-            "type": "string"
-          },
-          "description": "Optional arguments for the command"
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the component to update (e.g., 'API System', 'Rule Engine', 'Core Framework')"
+              },
+              "progress": {
+                "type": "number",
+                "description": "Progress percentage (0-100) for the component"
+              }
+            },
+            "required": ["name", "progress"]
+          }
+        },
+        "tasks": {
+          "type": "array",
+          "description": "Array of task objects to update. Each should have a name and progress percentage.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "Name of the task to update (e.g., 'Implement REST API endpoints', 'Add WebSocket support')"
+              },
+              "progress": {
+                "type": "number",
+                "description": "Progress percentage (0-100) for the task"
+              }
+            },
+            "required": ["name", "progress"]
+          }
         }
       }
     },
     {
-      "name": "calculate",
-      "description": "Perform basic calculations",
+      "name": "update-project-phase",
+      "description": "Updates the current development phase of the project. The framework has 4 phases: Setup (1), Rule Development (2), Agent Integration (3), and Deployment (4).",
       "parameters": {
-        "operation": {
-          "type": "string",
-          "description": "The operation to perform",
-          "enum": ["add", "subtract", "multiply", "divide"]
-        },
-        "a": {
+        "phaseId": {
           "type": "number",
-          "description": "First operand"
-        },
-        "b": {
-          "type": "number",
-          "description": "Second operand"
+          "description": "ID of the phase to set as current: 1 (Setup), 2 (Rule Development), 3 (Agent Integration), or 4 (Deployment)",
+          "minimum": 1,
+          "maximum": 4
         }
       }
     },
     {
-      "name": "activateDashboard",
-      "description": "Ensures the Agentic Framework dashboard is running and visible in the terminal.",
-      "parameters": {}
+      "name": "update-dashboard-data",
+      "description": "Updates a specific dashboard section with custom data. This allows agents to add notes, analysis, or custom content to the dashboard display.",
+      "parameters": {
+        "section": {
+          "type": "string",
+          "description": "Dashboard section to update. Can be: 'project-overview', 'current-phase', 'next-steps', 'agent-notes', 'next-milestones', or 'custom-analysis'."
+        },
+        "data": {
+          "type": "string",
+          "description": "New content to display in the specified section. Supports markdown formatting."
+        }
+      }
     }
   ],
   "authentication": {
@@ -69,6 +176,11 @@
   },
   "documentation": {
     "setup": "See README.md for setup instructions",
-    "usage": "Use the analyzeCode tool to analyze code quality, and the framework tool to interact with the Agentic Framework"
+    "usage": "The Agentic Framework MCP server provides tools in these categories: Dashboard Management (dashboard, dashboard-update), Framework Management (framework-status, framework-help), Rule Management (load-rule-set, unload-rule-set), Project Management (analyze-project, update-project-progress), and Dashboard Content (update-dashboard-data). For examples, see the README.md or test-direct-tools.js file.",
+    "examples": {
+      "analyzeCode": "{ \"name\": \"analyzeCode\", \"input\": { \"code\": \"function add(a, b) { return a+b; }\", \"language\": \"javascript\" } }",
+      "update-project-progress": "{ \"name\": \"update-project-progress\", \"input\": { \"components\": [{ \"name\": \"API System\", \"progress\": 75 }], \"tasks\": [{ \"name\": \"Implement REST API endpoints\", \"progress\": 80 }] } }",
+      "dashboard": "{ \"name\": \"dashboard\", \"input\": {} }"
+    }
   }
 } 

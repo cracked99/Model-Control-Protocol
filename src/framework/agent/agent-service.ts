@@ -331,4 +331,187 @@ class MetricsCollector {
       console.error('Error recording request metrics:', error);
     }
   }
+}
+
+/**
+ * Start the dashboard process
+ * This function initiates the dashboard UI for monitoring the framework
+ */
+export async function startDashboard(env: any): Promise<boolean> {
+  try {
+    console.log('Starting dashboard process');
+    
+    // Check if dashboard is already running
+    const existingStatusStr = await env.FRAMEWORK_KV?.get('dashboard:status');
+    const existingStatus = existingStatusStr ? JSON.parse(existingStatusStr) : null;
+    
+    if (existingStatus?.active) {
+      console.log('Dashboard is already running');
+      return true;
+    }
+    
+    // Store dashboard state in KV with session persistence flag
+    await env.FRAMEWORK_KV?.put('dashboard:status', JSON.stringify({
+      active: true,
+      persistent: true, // Mark as persistent for the entire session
+      startedAt: Date.now(),
+      pid: process.pid || 'unknown'
+    }));
+    
+    // Get the current status to display in the dashboard
+    const initSystem = await import('../core/init-system');
+    const config = await initSystem.getConfig(env);
+    
+    // Get rule metrics
+    const monitoringSystem = await import('../monitoring/monitoring-system');
+    const metrics = await monitoringSystem.collectSystemMetrics(env);
+    
+    // Log dashboard startup for the terminal UI
+    console.log('\n======================================');
+    console.log('📊 AGENTIC FRAMEWORK DASHBOARD 📊');
+    console.log('======================================');
+    console.log(`Status: ${config?.enabled ? '✅ Active' : '❌ Inactive'}`);
+    console.log(`Started: ${new Date().toLocaleString()}`);
+    console.log(`Persistence: Enabled for entire session`);
+    console.log(`Memory: ${metrics.data.memory?.used || 0}MB`);
+    console.log('======================================\n');
+    
+    // Ensure dashboard heartbeat (refresh dashboard status periodically)
+    const heartbeatInterval = setInterval(async () => {
+      try {
+        await env.FRAMEWORK_KV?.put('dashboard:heartbeat', Date.now().toString());
+      } catch (error) {
+        console.error('Dashboard heartbeat error:', error);
+      }
+    }, 30000); // Every 30 seconds
+    
+    // Setup refresh interval for live updates with error recovery
+    const createDashboardInterval = () => {
+      return setInterval(async () => {
+        try {
+          // Check if dashboard should still be active
+          const statusStr = await env.FRAMEWORK_KV?.get('dashboard:status');
+          const status = statusStr ? JSON.parse(statusStr) : { active: false };
+          
+          if (!status.active && !status.persistent) {
+            clearInterval(dashboardInterval);
+            clearInterval(heartbeatInterval);
+            console.log('Dashboard stopped');
+            return;
+          }
+          
+          // Update dashboard display
+          const updatedMetrics = await monitoringSystem.collectSystemMetrics(env);
+          
+          console.clear();
+          console.log('\n======================================');
+          console.log('📊 AGENTIC FRAMEWORK DASHBOARD 📊');
+          console.log('======================================');
+          console.log(`Status: ${config?.enabled ? '✅ Active' : '❌ Inactive'}`);
+          console.log(`Started: ${new Date(status.startedAt).toLocaleString()}`);
+          console.log(`Uptime: ${Math.floor((Date.now() - status.startedAt) / 1000)}s`);
+          console.log(`Persistence: ${status.persistent ? 'Enabled for entire session' : 'Standard'}`);
+          console.log(`Memory: ${updatedMetrics.data.memory?.used || 0}MB`);
+          console.log(`Rule Calls: ${updatedMetrics.data.ruleCalls || 0}`);
+          console.log(`Last Update: ${new Date().toLocaleString()}`);
+          console.log('======================================\n');
+          
+        } catch (error) {
+          console.error('Error updating dashboard:', error);
+          
+          // If interval fails, try to restart it after a brief delay
+          clearInterval(dashboardInterval);
+          setTimeout(() => {
+            dashboardInterval = createDashboardInterval();
+          }, 5000);
+        }
+      }, 3000);
+    };
+    
+    // Create the initial interval
+    let dashboardInterval = createDashboardInterval();
+    
+    // Setup recovery mechanism
+    const recoveryInterval = setInterval(async () => {
+      try {
+        const heartbeatStr = await env.FRAMEWORK_KV?.get('dashboard:heartbeat');
+        const lastHeartbeat = parseInt(heartbeatStr || '0');
+        
+        // If no heartbeat for 2 minutes, try to restart the dashboard
+        if (Date.now() - lastHeartbeat > 120000) {
+          clearInterval(dashboardInterval);
+          dashboardInterval = createDashboardInterval();
+          console.log('Dashboard recovered after inactivity');
+        }
+      } catch (error) {
+        console.error('Dashboard recovery error:', error);
+      }
+    }, 60000); // Check every minute
+    
+    // Make the dashboard highly resilient
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught exception in dashboard:', error);
+      
+      // Try to restart the dashboard
+      clearInterval(dashboardInterval);
+      dashboardInterval = createDashboardInterval();
+    });
+    
+    return true;
+  } catch (error) {
+    console.error('Error starting dashboard:', error);
+    return false;
+  }
+}
+
+/**
+ * Stop the dashboard
+ */
+export async function stopDashboard(env: any): Promise<boolean> {
+  try {
+    // Update dashboard status in KV
+    await env.FRAMEWORK_KV?.put('dashboard:status', JSON.stringify({ 
+      active: false,
+      persistent: false,
+      lastUpdate: Date.now()
+    }));
+    
+    return true;
+  } catch (error) {
+    console.error('Error stopping dashboard:', error);
+    return false;
+  }
+}
+
+/**
+ * Refresh the dashboard with updated data
+ * This is used to refresh the dashboard when data is updated by agents
+ */
+export async function refreshDashboard(env: any): Promise<boolean> {
+  try {
+    console.log('Refreshing dashboard with latest data');
+    
+    // Get current dashboard status
+    const statusStr = await env.FRAMEWORK_KV?.get('dashboard:status');
+    const status = statusStr ? JSON.parse(statusStr) : { active: false };
+    
+    // If dashboard is not active, nothing to refresh
+    if (!status.active) {
+      console.log('Dashboard is not active, no refresh needed');
+      return false;
+    }
+    
+    // Update dashboard status with new timestamp to trigger refresh
+    await env.FRAMEWORK_KV?.put('dashboard:status', JSON.stringify({
+      ...status,
+      lastUpdate: Date.now(),
+      refreshedByAgent: true
+    }));
+    
+    console.log('Dashboard refresh triggered');
+    return true;
+  } catch (error) {
+    console.error('Error refreshing dashboard:', error);
+    return false;
+  }
 } 
