@@ -18,20 +18,41 @@ async function testFramework() {
     const initResponse = await fetch(`${API_BASE}/api/framework/initialize`, {
       method: 'POST'
     });
-    const initData = await initResponse.json();
-    console.log('Initialization response:', initData);
+    
+    if (!initResponse.ok) {
+      console.error(`Initialization failed with status ${initResponse.status}: ${initResponse.statusText}`);
+      const text = await initResponse.text();
+      console.error('Response body:', text);
+    } else {
+      const initData = await initResponse.json();
+      console.log('Initialization response:', initData);
+    }
     
     // Test 2: Get framework status
     console.log('\n2. Testing framework status...');
     const statusResponse = await fetch(`${API_BASE}/api/framework/status`);
-    const statusData = await statusResponse.json();
-    console.log('Status response:', statusData);
+    
+    if (!statusResponse.ok) {
+      console.error(`Status request failed with status ${statusResponse.status}: ${statusResponse.statusText}`);
+      const text = await statusResponse.text();
+      console.error('Response body:', text);
+    } else {
+      const statusData = await statusResponse.json();
+      console.log('Status response:', statusData);
+    }
     
     // Test 3: List available rules
     console.log('\n3. Testing rule listing...');
     const rulesResponse = await fetch(`${API_BASE}/api/framework/rules/list`);
-    const rulesData = await rulesResponse.json();
-    console.log('Rules response:', rulesData);
+    
+    if (!rulesResponse.ok) {
+      console.error(`Rules listing failed with status ${rulesResponse.status}: ${rulesResponse.statusText}`);
+      const text = await rulesResponse.text();
+      console.error('Response body:', text);
+    } else {
+      const rulesData = await rulesResponse.json();
+      console.log('Rules response:', rulesData);
+    }
     
     // Test 4: Process a request through the agent
     console.log('\n4. Testing agent request processing...');
@@ -49,14 +70,28 @@ async function testFramework() {
         }
       })
     });
-    const agentData = await agentResponse.json();
-    console.log('Agent response:', agentData);
+    
+    if (!agentResponse.ok) {
+      console.error(`Agent request failed with status ${agentResponse.status}: ${agentResponse.statusText}`);
+      const text = await agentResponse.text();
+      console.error('Response body:', text);
+    } else {
+      const agentData = await agentResponse.json();
+      console.log('Agent response:', agentData);
+    }
     
     // Test 5: Get monitoring metrics
     console.log('\n5. Testing monitoring metrics...');
     const metricsResponse = await fetch(`${API_BASE}/api/monitoring/metrics`);
-    const metricsData = await metricsResponse.json();
-    console.log('Metrics response:', metricsData);
+    
+    if (!metricsResponse.ok) {
+      console.error(`Metrics request failed with status ${metricsResponse.status}: ${metricsResponse.statusText}`);
+      const text = await metricsResponse.text();
+      console.error('Response body:', text);
+    } else {
+      const metricsData = await metricsResponse.json();
+      console.log('Metrics response:', metricsData);
+    }
     
     // Test 6: Use the framework command tool
     console.log('\n6. Testing framework command tool...');
@@ -78,8 +113,15 @@ async function testFramework() {
         ]
       })
     });
-    const commandData = await commandResponse.json();
-    console.log('Command response:', commandData);
+    
+    if (!commandResponse.ok) {
+      console.error(`Command request failed with status ${commandResponse.status}: ${commandResponse.statusText}`);
+      const text = await commandResponse.text();
+      console.error('Response body:', text);
+    } else {
+      const commandData = await commandResponse.json();
+      console.log('Command response:', commandData);
+    }
     
     console.log('\nAll tests completed!');
   } catch (error) {

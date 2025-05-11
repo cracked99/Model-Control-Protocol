@@ -41,7 +41,7 @@ async function handleStatusCommand(args: string[], env: any): Promise<CommandRes
     // Get framework status
     const initSystem = await import('./init-system');
     const config = await initSystem.getConfig(env);
-    const isEnabled = config.settings.initialization.enabled;
+    const isEnabled = config?.enabled || false;
     
     // Get loaded rules
     const ruleEngine = await import('../rule-engine/rule-engine');
@@ -49,7 +49,7 @@ async function handleStatusCommand(args: string[], env: any): Promise<CommandRes
     
     // Get metrics if enabled
     let metrics = null;
-    if (config.settings.framework.enableMetrics) {
+    if (config?.monitoring?.enabled) {
       const monitoring = await import('../monitoring/monitoring-system');
       const systemMetrics = await monitoring.collectSystemMetrics(env);
       
@@ -118,11 +118,10 @@ async function handleLoadCommand(args: string[], env: any): Promise<CommandRespo
   try {
     const ruleEngine = await import('../rule-engine/rule-engine');
     
-    // This is a simplified version - in reality, we would need to map rule names to triggers
-    const mockTriggers = [ruleSet.replace('-', '_')];
-    const loadedRules = await ruleEngine.loadOnDemandRules(env, mockTriggers);
+    // Load the rule set
+    const success = await ruleEngine.loadRuleSet(env, ruleSet);
     
-    if (loadedRules.length === 0) {
+    if (!success) {
       return {
         status: 'error',
         message: `Rule set "${ruleSet}" not found or already loaded.`,
@@ -156,7 +155,7 @@ async function handleUnloadCommand(args: string[], env: any): Promise<CommandRes
   
   try {
     const ruleEngine = await import('../rule-engine/rule-engine');
-    const success = await ruleEngine.unloadRule(env, ruleSet);
+    const success = await ruleEngine.unloadRuleSet(env, ruleSet);
     
     if (!success) {
       return {
@@ -250,20 +249,25 @@ async function handleResetCommand(args: string[], env: any): Promise<CommandResp
     const initSystem = await import('./init-system');
     
     const defaultConfig = {
-      settings: {
-        initialization: {
-          enabled: true,
-        },
-        framework: {
-          enableMetrics: true,
-        },
+      enabled: true,
+      version: '1.0.0',
+      monitoring: {
+        enabled: true,
+        interval: 60000, // 1 minute
+      },
+      rules: {
+        core: ['core-agent-behavior'],
+        enhancement: ['rule-prioritization', 'context-retention'],
+        onDemand: ['feedback-integration', 'code-quality-development'],
+      },
+      feedback: {
+        enabled: true,
+        storageLimit: 100,
       },
     };
     
-    await initSystem.saveConfig(env, defaultConfig);
-    
-    // Reinitialize the framework
-    const result = await initSystem.initializeFramework(env);
+    // Reinitialize the framework with default config
+    const result = await initSystem.resetFramework(env);
     
     if (result.status === 'error') {
       return {

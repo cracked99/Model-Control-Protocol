@@ -77,7 +77,7 @@ export class MyMCP extends McpAgent {
 			async ({ command, args = [] }) => {
 				const result = await frameworkCommands.handleFrameworkCommand([command, ...args], globalEnv);
 				return {
-					content: [{ type: "text", text: result.message }],
+					content: [{ type: "text", text: result.message || "Command executed" }],
 				};
 			}
 		);
@@ -89,6 +89,8 @@ const router = Router();
 
 // Add framework API routes
 router.all('/api/framework/*', (request, env, ctx) => frameworkApi.handleRequest(request, env));
+router.all('/api/agent/*', (request, env, ctx) => frameworkApi.handleRequest(request, env));
+router.all('/api/monitoring/*', (request, env, ctx) => frameworkApi.handleRequest(request, env));
 
 // Default handler for non-API routes
 router.all('*', (request, env, ctx) => {
@@ -104,11 +106,7 @@ router.all('*', (request, env, ctx) => {
 		return MyMCP.serve("/mcp").fetch(request, env, ctx);
 	}
 
-	// Serve API routes
-	if (url.pathname.startsWith('/api/')) {
-		return router.handle(request, env, ctx);
-	}
-
+	// Return 404 for unknown routes
 	return new Response("Not found", { status: 404 });
 });
 
@@ -118,7 +116,7 @@ export default {
 		globalEnv = env;
 		
 		// Initialize framework API
-		await frameworkApi.initialize();
+		await frameworkApi.initialize(env);
 		
 		// Handle the request using the router
 		return router.handle(request, env, ctx);

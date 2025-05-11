@@ -7,14 +7,214 @@ import * as LZString from 'lz-string';
 import { Context } from '../types';
 
 /**
+ * Memory Management System for organizing context information
+ */
+class MemoryManager {
+  // Memory storage tiers
+  private shortTermMemory: Map<string, any> = new Map();
+  private workingMemory: Map<string, any> = new Map();
+  private longTermMemory: Map<string, any> = new Map();
+  
+  constructor() {
+    // Initialize memory systems
+  }
+  
+  storeInShortTerm(key: string, data: any): void {
+    this.shortTermMemory.set(key, {
+      data,
+      timestamp: Date.now(),
+      accessCount: 0
+    });
+    
+    // Enforce short-term memory limits
+    this.enforceMemoryLimits('shortTerm', 20);
+  }
+  
+  storeInWorkingMemory(key: string, data: any): void {
+    this.workingMemory.set(key, {
+      data,
+      timestamp: Date.now(),
+      accessCount: 0
+    });
+    
+    // Enforce working memory limits
+    this.enforceMemoryLimits('working', 50);
+  }
+  
+  storeInLongTermMemory(key: string, data: any): void {
+    this.longTermMemory.set(key, {
+      data,
+      timestamp: Date.now(),
+      accessCount: 0
+    });
+    
+    // Enforce long-term memory limits
+    this.enforceMemoryLimits('longTerm', 100);
+  }
+  
+  retrieveMemory(key: string): any {
+    // Try short-term first
+    if (this.shortTermMemory.has(key)) {
+      const memory = this.shortTermMemory.get(key);
+      memory.accessCount++;
+      return memory.data;
+    }
+    
+    // Try working memory next
+    if (this.workingMemory.has(key)) {
+      const memory = this.workingMemory.get(key);
+      memory.accessCount++;
+      
+      // Promote frequently accessed memories to short-term
+      if (memory.accessCount > 5) {
+        this.storeInShortTerm(key, memory.data);
+      }
+      
+      return memory.data;
+    }
+    
+    // Try long-term memory last
+    if (this.longTermMemory.has(key)) {
+      const memory = this.longTermMemory.get(key);
+      memory.accessCount++;
+      
+      // Promote frequently accessed memories to working memory
+      if (memory.accessCount > 3) {
+        this.storeInWorkingMemory(key, memory.data);
+      }
+      
+      return memory.data;
+    }
+    
+    return null;
+  }
+  
+  private enforceMemoryLimits(memoryType: string, limit: number): void {
+    let targetMemory: Map<string, any>;
+    
+    switch (memoryType) {
+      case 'shortTerm':
+        targetMemory = this.shortTermMemory;
+        break;
+      case 'working':
+        targetMemory = this.workingMemory;
+        break;
+      case 'longTerm':
+        targetMemory = this.longTermMemory;
+        break;
+      default:
+        return;
+    }
+    
+    if (targetMemory.size <= limit) return;
+    
+    // Sort by least recently accessed and lowest access count
+    const entries = Array.from(targetMemory.entries())
+      .sort((a, b) => {
+        // First by access count (ascending)
+        const accessDiff = a[1].accessCount - b[1].accessCount;
+        if (accessDiff !== 0) return accessDiff;
+        
+        // Then by timestamp (oldest first)
+        return a[1].timestamp - b[1].timestamp;
+      });
+    
+    // Remove oldest entries until we're under the limit
+    const entriesToRemove = entries.slice(0, targetMemory.size - limit);
+    for (const [key] of entriesToRemove) {
+      targetMemory.delete(key);
+    }
+  }
+  
+  getAllMemories(): { shortTerm: any[], working: any[], longTerm: any[] } {
+    return {
+      shortTerm: Array.from(this.shortTermMemory.entries()),
+      working: Array.from(this.workingMemory.entries()),
+      longTerm: Array.from(this.longTermMemory.entries())
+    };
+  }
+}
+
+/**
+ * Context Summarization Engine for creating concise context representations
+ */
+class SummarizationEngine {
+  summarizeInteraction(request: any, response: any): string {
+    // Extract key information from the interaction
+    const requestType = this.classifyRequest(request.content);
+    const responseType = this.classifyResponse(response.content);
+    
+    // Generate a concise summary
+    return `${requestType} request received a ${responseType} response`;
+  }
+  
+  summarizeContext(context: Context): string {
+    if (!context.data.interactions || context.data.interactions.length === 0) {
+      return "No previous interactions";
+    }
+    
+    // Count interaction types
+    const interactionCount = context.data.interactions.length;
+    
+    // Extract key information
+    const keyTopics = this.extractKeyTopics(context.data.interactions);
+    const userPreferences = this.extractUserPreferences(context.data);
+    
+    // Generate summary
+    let summary = `Session with ${interactionCount} interactions`;
+    
+    if (keyTopics.length > 0) {
+      summary += ` discussing ${keyTopics.join(", ")}`;
+    }
+    
+    if (Object.keys(userPreferences).length > 0) {
+      summary += `. User preferences: ${JSON.stringify(userPreferences)}`;
+    }
+    
+    return summary;
+  }
+  
+  private classifyRequest(content: string): string {
+    // Simple classification based on keywords
+    if (content.includes("help") || content.includes("?")) return "assistance";
+    if (content.includes("create") || content.includes("make")) return "creation";
+    if (content.includes("update") || content.includes("change")) return "modification";
+    if (content.includes("delete") || content.includes("remove")) return "deletion";
+    return "general";
+  }
+  
+  private classifyResponse(content: string): string {
+    // Simple classification based on response characteristics
+    if (content.includes("error") || content.includes("cannot")) return "error";
+    if (content.includes("success") || content.includes("completed")) return "success";
+    if (content.includes("here's how") || content.includes("steps")) return "instructional";
+    return "informational";
+  }
+  
+  private extractKeyTopics(interactions: any[]): string[] {
+    // In a real implementation, this would use NLP to extract key topics
+    // For now, we'll just return a placeholder
+    return ["framework", "development"];
+  }
+  
+  private extractUserPreferences(contextData: any): Record<string, any> {
+    return contextData.userPreferences || {};
+  }
+}
+
+/**
  * Context Manager handles storing and retrieving context for agent interactions
  */
 export class ContextManager {
   private contextStore: Map<string, Context> = new Map();
   private compressionEngine: CompressionEngine;
+  private memoryManager: MemoryManager;
+  private summarizationEngine: SummarizationEngine;
   
   constructor() {
     this.compressionEngine = new CompressionEngine();
+    this.memoryManager = new MemoryManager();
+    this.summarizationEngine = new SummarizationEngine();
   }
   
   async initialize(env: any): Promise<{ status: string }> {
@@ -35,6 +235,13 @@ export class ContextManager {
       return this.contextStore.get(contextKey)!;
     }
     
+    // Try to get from memory manager
+    const memoryContext = this.memoryManager.retrieveMemory(`context:${contextKey}`);
+    if (memoryContext) {
+      this.contextStore.set(contextKey, memoryContext);
+      return memoryContext;
+    }
+    
     // Try to get from KV
     try {
       const storedContext = await env.FRAMEWORK_KV?.get(`context:${contextKey}`);
@@ -47,6 +254,10 @@ export class ContextManager {
         }
         
         this.contextStore.set(contextKey, context);
+        
+        // Store in memory manager for faster access next time
+        this.memoryManager.storeInWorkingMemory(`context:${contextKey}`, context);
+        
         return context;
       }
     } catch (error) {
@@ -66,13 +277,28 @@ export class ContextManager {
     const currentContext = this.contextStore.get(contextKey) || this.createInitialContext(request);
     
     // Extract relevant information from response
-    const updatedContext = this.extractContextFromResponse(currentContext, response);
+    const updatedContext = this.extractContextFromResponse(currentContext, request, response);
+    
+    // Generate context summary
+    updatedContext.metadata.summary = this.summarizationEngine.summarizeContext(updatedContext);
     
     // Compress context if needed
     const compressedContext = await this.compressionEngine.compressIfNeeded(updatedContext);
     
     // Store updated context in memory
     this.contextStore.set(contextKey, compressedContext);
+    
+    // Store in appropriate memory tier based on recency and importance
+    const isRecentInteraction = Date.now() - new Date(updatedContext.lastUpdated).getTime() < 3600000; // 1 hour
+    const isImportantInteraction = this.isImportantInteraction(request, response);
+    
+    if (isRecentInteraction && isImportantInteraction) {
+      this.memoryManager.storeInShortTerm(`context:${contextKey}`, compressedContext);
+    } else if (isRecentInteraction || isImportantInteraction) {
+      this.memoryManager.storeInWorkingMemory(`context:${contextKey}`, compressedContext);
+    } else {
+      this.memoryManager.storeInLongTermMemory(`context:${contextKey}`, compressedContext);
+    }
     
     // Persist context if needed
     if (this.shouldPersistContext(contextKey)) {
@@ -97,16 +323,18 @@ export class ContextManager {
         interactions: [],
         userPreferences: {},
         knowledgeBase: {},
+        entityRecognition: {},
       },
       metadata: {
         compressionLevel: 0,
         originalSize: 0,
         compressedSize: 0,
+        summary: "New context created",
       },
     };
   }
   
-  extractContextFromResponse(currentContext: Context, response: any): Context {
+  extractContextFromResponse(currentContext: Context, request: any, response: any): Context {
     // Create a copy of the current context
     const updatedContext: Context = {
       ...currentContext,
@@ -119,25 +347,105 @@ export class ContextManager {
       updatedContext.data.interactions = [];
     }
     
+    // Generate interaction summary
+    const interactionSummary = this.summarizationEngine.summarizeInteraction(request, response);
+    
     updatedContext.data.interactions.push({
       timestamp: new Date().toISOString(),
       request: response.requestId,
       response: response.id,
-      summary: this.generateInteractionSummary(response),
+      summary: interactionSummary,
     });
     
+    // Extract and update user preferences
+    this.updateUserPreferences(updatedContext, request, response);
+    
+    // Update knowledge base with any new information
+    this.updateKnowledgeBase(updatedContext, request, response);
+    
+    // Update entity recognition
+    this.updateEntityRecognition(updatedContext, request, response);
+    
     // Limit the number of interactions stored
-    if (updatedContext.data.interactions.length > 10) {
-      updatedContext.data.interactions = updatedContext.data.interactions.slice(-10);
+    if (updatedContext.data.interactions.length > 20) {
+      // Keep the first 5 (initial context) and the last 15 (recent interactions)
+      const initialInteractions = updatedContext.data.interactions.slice(0, 5);
+      const recentInteractions = updatedContext.data.interactions.slice(-15);
+      updatedContext.data.interactions = [...initialInteractions, ...recentInteractions];
     }
     
     return updatedContext;
   }
   
-  generateInteractionSummary(response: any): string {
-    // In a real implementation, this would generate a concise summary
-    // of the interaction for efficient context storage
-    return response.content.substring(0, 100) + (response.content.length > 100 ? '...' : '');
+  private updateUserPreferences(context: Context, request: any, response: any): void {
+    // In a real implementation, this would extract user preferences
+    // from the request and response
+    if (!context.data.userPreferences) {
+      context.data.userPreferences = {};
+    }
+    
+    // Example: Extract preferred format if mentioned
+    if (request.content.includes("in JSON format")) {
+      context.data.userPreferences.preferredFormat = "JSON";
+    } else if (request.content.includes("in markdown")) {
+      context.data.userPreferences.preferredFormat = "markdown";
+    }
+  }
+  
+  private updateKnowledgeBase(context: Context, request: any, response: any): void {
+    // In a real implementation, this would extract key information
+    // and store it in the knowledge base
+    if (!context.data.knowledgeBase) {
+      context.data.knowledgeBase = {};
+    }
+    
+    // Example: Extract framework-related information
+    if (request.content.includes("framework") || response.content.includes("framework")) {
+      context.data.knowledgeBase.frameworkDiscussed = true;
+    }
+  }
+  
+  private updateEntityRecognition(context: Context, request: any, response: any): void {
+    // In a real implementation, this would use NER to extract entities
+    if (!context.data.entityRecognition) {
+      context.data.entityRecognition = {};
+    }
+    
+    // Simple entity extraction (in a real system, this would use NLP)
+    const combinedText = request.content + " " + response.content;
+    
+    // Extract potential entities (very simplified)
+    const potentialEntities = combinedText.match(/[A-Z][a-z]+(?:\s[A-Z][a-z]+)*/g) || [];
+    
+    for (const entity of potentialEntities) {
+      if (!context.data.entityRecognition[entity]) {
+        context.data.entityRecognition[entity] = 1;
+      } else {
+        context.data.entityRecognition[entity]++;
+      }
+    }
+  }
+  
+  isImportantInteraction(request: any, response: any): boolean {
+    // Determine if an interaction is important enough to keep in short-term memory
+    // In a real implementation, this would use more sophisticated heuristics
+    
+    // Check for error responses
+    if (response.content.includes("error") || response.content.includes("failed")) {
+      return true;
+    }
+    
+    // Check for important requests
+    if (request.content.includes("important") || request.content.includes("critical")) {
+      return true;
+    }
+    
+    // Check for long interactions (indicating complexity)
+    if (request.content.length > 200 || response.content.length > 500) {
+      return true;
+    }
+    
+    return false;
   }
   
   shouldPersistContext(contextKey: string): boolean {
@@ -166,6 +474,11 @@ export class ContextManager {
       console.error('Error loading persistent context:', error);
     }
   }
+  
+  async getContextSummary(env: any, sessionId: string): Promise<string> {
+    const context = await this.getContext(env, { sessionId });
+    return context.metadata.summary || "No summary available";
+  }
 }
 
 /**
@@ -190,16 +503,34 @@ class CompressionEngine {
       };
     }
     
+    // Determine compression level based on size
+    let compressionLevel = 1;
+    if (originalSize > 10000) compressionLevel = 2;
+    if (originalSize > 50000) compressionLevel = 3;
+    
     // Compress the context data
-    const compressedData = this.compress(context.data, 1);
+    const compressedData = this.compress(context.data, compressionLevel);
     const compressedSize = JSON.stringify(compressedData).length;
+    
+    // Only use compression if it actually reduces size
+    if (compressedSize >= originalSize) {
+      return {
+        ...context,
+        metadata: {
+          ...context.metadata,
+          compressionLevel: 0,
+          originalSize,
+          compressedSize: originalSize,
+        },
+      };
+    }
     
     return {
       ...context,
       data: compressedData,
       metadata: {
         ...context.metadata,
-        compressionLevel: 1,
+        compressionLevel,
         originalSize,
         compressedSize,
       },
@@ -212,18 +543,49 @@ class CompressionEngine {
     // Convert to string
     const dataStr = JSON.stringify(data);
     
-    // Compress using LZ-based compression
-    return LZString.compress(dataStr);
+    // Apply different compression techniques based on level
+    switch (level) {
+      case 1:
+        // Basic LZ compression
+        return LZString.compress(dataStr);
+      case 2:
+        // UTF16 compression (better for longer texts)
+        return LZString.compressToUTF16(dataStr);
+      case 3:
+        // URI-safe compression (maximum compression)
+        return LZString.compressToEncodedURIComponent(dataStr);
+      default:
+        return LZString.compress(dataStr);
+    }
   }
   
   decompress(data: any, level: number): any {
     if (level === 0) return data;
     
-    // Decompress using LZ-based decompression
-    const decompressed = LZString.decompress(data);
+    let decompressed;
+    
+    // Apply corresponding decompression technique
+    switch (level) {
+      case 1:
+        decompressed = LZString.decompress(data);
+        break;
+      case 2:
+        decompressed = LZString.decompressFromUTF16(data);
+        break;
+      case 3:
+        decompressed = LZString.decompressFromEncodedURIComponent(data);
+        break;
+      default:
+        decompressed = LZString.decompress(data);
+    }
     
     // Parse back to object
-    return JSON.parse(decompressed || '{}');
+    try {
+      return JSON.parse(decompressed || '{}');
+    } catch (e) {
+      console.error('Error parsing decompressed data:', e);
+      return {};
+    }
   }
 }
 
@@ -231,4 +593,5 @@ class CompressionEngine {
 const contextManager = new ContextManager();
 export const initialize = contextManager.initialize.bind(contextManager);
 export const getContext = contextManager.getContext.bind(contextManager);
-export const updateContext = contextManager.updateContext.bind(contextManager); 
+export const updateContext = contextManager.updateContext.bind(contextManager);
+export const getContextSummary = contextManager.getContextSummary.bind(contextManager); 

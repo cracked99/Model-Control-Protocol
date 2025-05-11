@@ -2,344 +2,434 @@
  * Framework API Implementation
  */
 
-import { Router } from 'itty-router';
 import { CommandResponse, AgentRequest } from '../types';
-
-// Create a new router
-const router = Router();
+import * as initSystem from '../core/init-system';
+import * as monitoringSystem from '../monitoring/monitoring-system';
+import * as agentService from '../agent/agent-service';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Initialize the API
+ * Initialize the Framework API
  */
-export async function initialize(): Promise<{ status: string }> {
+export async function initialize(env: any): Promise<void> {
   console.log('Initializing Framework API...');
-  return { status: 'success' };
 }
 
 /**
- * Handle framework API requests
+ * Handle API requests
  */
 export async function handleRequest(request: Request, env: any): Promise<Response> {
-  return router.handle(request, env);
-}
-
-// Define API routes
-
-/**
- * Initialize the framework
- */
-router.post('/api/framework/initialize', async (request: Request, env: any) => {
   try {
-    const initSystem = await import('../core/init-system');
-    const result = await initSystem.initializeFramework(env);
+    const url = new URL(request.url);
+    const path = url.pathname;
     
-    return createJsonResponse({
-      status: result.status === 'error' ? 'error' : 'success',
-      message: result.message,
-      data: { activeRules: result.activeRules },
-    });
-  } catch (error) {
-    return createErrorResponse('Error initializing framework', error);
-  }
-});
-
-/**
- * Get framework status
- */
-router.get('/api/framework/status', async (request: Request, env: any) => {
-  try {
-    const initSystem = await import('../core/init-system');
-    const ruleEngine = await import('../rule-engine/rule-engine');
-    const monitoring = await import('../monitoring/monitoring-system');
-    
-    // Get config
-    const config = await initSystem.getConfig(env);
-    
-    // Get loaded rules
-    const loadedRules = await ruleEngine.getActiveRules();
-    
-    // Get metrics if enabled
-    let metrics = null;
-    if (config.settings.framework.enableMetrics) {
-      const systemMetrics = await monitoring.collectSystemMetrics(env);
-      metrics = {
-        ruleCalls: systemMetrics.data.ruleCalls || 0,
-        responseTimes: systemMetrics.data.responseTimes || {
-          avg: 0,
-          min: 0,
-          max: 0,
-        },
-        memoryUsage: `${Math.round(systemMetrics.data.memory?.used || 0)}MB`,
-      };
+    // Framework API routes
+    if (path === '/api/framework/initialize') {
+      return handleInitializeRequest(request, env);
+    } else if (path === '/api/framework/status') {
+      return handleStatusRequest(request, env);
+    } else if (path === '/api/framework/rules/load') {
+      return handleLoadRulesRequest(request, env);
+    } else if (path === '/api/framework/rules/unload') {
+      return handleUnloadRulesRequest(request, env);
+    } else if (path === '/api/framework/rules/list') {
+      return handleListRulesRequest(request, env);
+    } else if (path === '/api/framework/reset') {
+      return handleResetRequest(request, env);
+    } else if (path === '/api/agent/process') {
+      return handleProcessRequest(request, env);
+    } else if (path === '/api/agent/context') {
+      return handleContextRequest(request, env);
+    } else if (path === '/api/monitoring/metrics') {
+      return handleMetricsRequest(request, env);
+    } else if (path === '/api/agent/feedback') {
+      return handleFeedbackRequest(request, env);
+    } else if (path === '/api/agent/feedback/analysis') {
+      return handleFeedbackAnalysisRequest(request, env);
     }
     
+    // If no route matches, return 404
+    return createJsonResponse({ error: 'Not Found' }, 404);
+  } catch (error) {
+    console.error('Error handling API request:', error);
+    return createErrorResponse('Internal server error', error, 500);
+  }
+}
+
+// Alias for backward compatibility
+export const handleApiRequest = handleRequest;
+
+/**
+ * Handle initialize request
+ */
+async function handleInitializeRequest(request: Request, env: any): Promise<Response> {
+  try {
+    // Initialize framework
+    const result = await initSystem.initializeFramework(env);
+    
+    // Return result
+    return createJsonResponse({
+      status: result.status === 'error' ? 'error' : 'success',
+      message: 'Framework initialized',
+    });
+  } catch (error) {
+    console.error('Error initializing framework:', error);
+    return createErrorResponse('Error initializing framework', error);
+  }
+}
+
+/**
+ * Handle status request
+ */
+async function handleStatusRequest(request: Request, env: any): Promise<Response> {
+  try {
+    // Get framework status
+    const isEnabled = initSystem.isFrameworkEnabled();
+    const config = await initSystem.getConfig(env);
+    
+    // Get metrics if monitoring is enabled
+    let metrics = null;
+    if (config && config.monitoring && config.monitoring.enabled) {
+      metrics = await monitoringSystem.getMetrics(env);
+    }
+    
+    // Return status
     return createJsonResponse({
       status: 'success',
-      message: 'Framework status retrieved successfully',
       data: {
-        isEnabled: config.settings.initialization.enabled,
-        loadedRules: loadedRules.map(rule => ({
-          name: rule.name,
-          type: rule.type,
-          status: 'active',
-        })),
+        enabled: isEnabled,
+        config,
         metrics,
       },
     });
   } catch (error) {
+    console.error('Error getting framework status:', error);
     return createErrorResponse('Error getting framework status', error);
   }
-});
+}
 
 /**
- * Load specific rule sets
+ * Handle metrics request
  */
-router.post('/api/framework/rules/load', async (request: Request, env: any) => {
+async function handleMetricsRequest(request: Request, env: any): Promise<Response> {
   try {
-    const { ruleSets, triggers } = await request.json() as { ruleSets?: string[]; triggers?: string[] };
+    // Get metrics
+    const metrics = await monitoringSystem.getMetrics(env);
     
-    if (!ruleSets && !triggers) {
-      return createJsonResponse({
-        status: 'error',
-        message: 'Either ruleSets or triggers must be provided',
-      }, 400);
-    }
-    
-    const ruleEngine = await import('../rule-engine/rule-engine');
-    
-    let loadedRules;
-    if (triggers) {
-      // Load rules by triggers
-      loadedRules = await ruleEngine.loadOnDemandRules(env, triggers);
-    } else {
-      // Load specific rule sets
-      // In a real implementation, this would load the specified rule sets
-      loadedRules = [];
-      for (const ruleName of ruleSets!) {
-        // This is a simplified version - in reality, we would need to map rule names to triggers
-        const mockTriggers = [ruleName.replace('-', '_')];
-        const rules = await ruleEngine.loadOnDemandRules(env, mockTriggers);
-        loadedRules.push(...rules);
-      }
-    }
-    
+    // Return metrics
     return createJsonResponse({
       status: 'success',
-      message: `Loaded ${loadedRules.length} rule(s) successfully`,
       data: {
-        loadedRules: loadedRules.map(rule => rule.name),
+        metrics: {
+          ruleCalls: metrics.ruleCalls,
+          responseTime: {
+            avg: metrics.responseTimeAvg,
+            min: metrics.responseTimeMin,
+            max: metrics.responseTimeMax,
+          },
+          memory: metrics.memoryUsage,
+          cpu: metrics.cpuUsage,
+          activeRules: metrics.activeRules,
+          requestRate: metrics.requestRate,
+        },
       },
     });
   } catch (error) {
-    return createErrorResponse('Error loading rules', error);
+    console.error('Error getting metrics:', error);
+    return createErrorResponse('Error getting metrics', error);
   }
-});
+}
 
 /**
- * Unload specific rule sets
+ * Handle load rules request
  */
-router.post('/api/framework/rules/unload', async (request: Request, env: any) => {
+async function handleLoadRulesRequest(request: Request, env: any): Promise<Response> {
   try {
-    const { ruleSets } = await request.json() as { ruleSets: string[] };
+    // Get request body
+    const body = await request.json() as { ruleSet?: string };
     
-    if (!ruleSets || !Array.isArray(ruleSets)) {
-      return createJsonResponse({
-        status: 'error',
-        message: 'ruleSets must be provided as an array',
-      }, 400);
+    if (!body.ruleSet) {
+      return createErrorResponse('Missing ruleSet parameter', null);
     }
     
-    const ruleEngine = await import('../rule-engine/rule-engine');
+    // Load rule set
+    const result = await initSystem.loadRuleSet(env, body.ruleSet);
     
-    const results = [];
-    for (const ruleName of ruleSets) {
-      const success = await ruleEngine.unloadRule(env, ruleName);
-      results.push({ ruleName, success });
-    }
-    
-    const successCount = results.filter(r => r.success).length;
-    
-    return createJsonResponse({
-      status: 'success',
-      message: `Unloaded ${successCount} rule(s) successfully`,
-      data: { results },
-    });
+    // Return result
+    return createJsonResponse(result);
   } catch (error) {
-    return createErrorResponse('Error unloading rules', error);
+    console.error('Error loading rule set:', error);
+    return createErrorResponse('Error loading rule set', error);
   }
-});
+}
 
 /**
- * List all available rule sets
+ * Handle unload rules request
  */
-router.get('/api/framework/rules/list', async (request: Request, env: any) => {
+async function handleUnloadRulesRequest(request: Request, env: any): Promise<Response> {
   try {
-    const ruleEngine = await import('../rule-engine/rule-engine');
+    // Get request body
+    const body = await request.json() as { ruleSet?: string };
     
-    // Get active rules
-    const activeRules = await ruleEngine.getActiveRules();
-    const activeRuleNames = activeRules.map(rule => rule.name);
+    if (!body.ruleSet) {
+      return createErrorResponse('Missing ruleSet parameter', null);
+    }
     
-    // In a real implementation, this would get all available rules from storage
-    // For this example, we'll just return the core and on-demand rules we've defined
+    // Unload rule set
+    const result = await initSystem.unloadRuleSet(env, body.ruleSet);
     
-    const availableRules = [
-      { name: 'core-agent-behavior', type: 'core', location: 'always_active/core_rules' },
-      { name: 'rule-prioritization', type: 'enhancement', location: 'always_active/core_enhancements' },
-      { name: 'context-retention', type: 'enhancement', location: 'always_active/core_enhancements' },
-      { name: 'code-quality-development', type: 'on-demand', location: 'on_demand/comprehensive' },
-      { name: 'architectural-guidelines', type: 'on-demand', location: 'on_demand/comprehensive' },
-    ];
+    // Return result
+    return createJsonResponse(result);
+  } catch (error) {
+    console.error('Error unloading rule set:', error);
+    return createErrorResponse('Error unloading rule set', error);
+  }
+}
+
+/**
+ * Handle list rules request
+ */
+async function handleListRulesRequest(request: Request, env: any): Promise<Response> {
+  try {
+    // Get rule sets
+    const ruleSets = await initSystem.listRuleSets(env);
     
-    // Mark active rules
-    const rulesWithStatus = availableRules.map(rule => ({
-      ...rule,
-      isActive: activeRuleNames.includes(rule.name),
-    }));
-    
+    // Return rule sets
     return createJsonResponse({
       status: 'success',
-      message: 'Rule sets retrieved successfully',
-      data: { rules: rulesWithStatus },
+      data: {
+        ruleSets,
+      },
     });
   } catch (error) {
+    console.error('Error listing rule sets:', error);
     return createErrorResponse('Error listing rule sets', error);
   }
-});
+}
 
 /**
- * Reset framework to default state
+ * Handle reset request
  */
-router.post('/api/framework/reset', async (request: Request, env: any) => {
+async function handleResetRequest(request: Request, env: any): Promise<Response> {
   try {
-    // In a real implementation, this would reset the framework to its default state
-    // For this example, we'll just reinitialize the framework
+    // Reset framework
+    const result = await initSystem.resetFramework(env);
     
-    const initSystem = await import('../core/init-system');
-    
-    // Reset config to default
-    const defaultConfig = {
-      settings: {
-        initialization: {
-          enabled: true,
-        },
-        framework: {
-          enableMetrics: true,
-        },
-      },
-    };
-    
-    await initSystem.saveConfig(env, defaultConfig);
-    
-    // Reinitialize the framework
-    const result = await initSystem.initializeFramework(env);
-    
+    // Return result
     return createJsonResponse({
       status: result.status === 'error' ? 'error' : 'success',
-      message: 'Framework reset to default state',
-      data: { activeRules: result.activeRules },
+      message: 'Framework reset',
     });
   } catch (error) {
+    console.error('Error resetting framework:', error);
     return createErrorResponse('Error resetting framework', error);
   }
-});
+}
 
 /**
- * Process a request through the agent
+ * Handle process request
  */
-router.post('/api/agent/process', async (request: Request, env: any) => {
+async function handleProcessRequest(request: Request, env: any): Promise<Response> {
   try {
-    const requestData = await request.json();
+    // Get request body
+    const body = await request.json() as Record<string, any>;
     
-    // Validate and create a proper AgentRequest
-    if (!requestData || typeof requestData !== 'object' || !('content' in requestData)) {
-      return createJsonResponse({
-        status: 'error',
-        message: 'Request content is required',
-      }, 400);
+    // Validate request data
+    if (!body || typeof body !== 'object') {
+      return createErrorResponse('Invalid request data', null);
     }
     
-    // Extract metadata safely
-    let metadata: Record<string, any> | undefined = undefined;
-    if ('metadata' in requestData && requestData.metadata && typeof requestData.metadata === 'object') {
-      metadata = requestData.metadata as Record<string, any>;
-    }
-    
+    // Create agent request
     const agentRequest: AgentRequest = {
-      id: ('id' in requestData && typeof requestData.id === 'string') ? requestData.id : crypto.randomUUID(),
-      sessionId: ('sessionId' in requestData && typeof requestData.sessionId === 'string') ? requestData.sessionId : crypto.randomUUID(),
-      content: String(requestData.content),
-      metadata: metadata,
+      id: body.id || uuidv4(),
+      sessionId: body.sessionId || uuidv4(),
+      userId: body.userId || 'anonymous',
+      command: body.command || '',
+      metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
     };
     
-    const agentService = await import('../agent-service/agent-service');
-    const response = await agentService.processRequest(env, agentRequest);
+    // Process request
+    const result = await agentService.processRequest(env, agentRequest);
     
+    // Return result
     return createJsonResponse({
       status: 'success',
-      message: 'Request processed successfully',
-      data: { response },
+      data: result,
     });
   } catch (error) {
+    console.error('Error processing request:', error);
     return createErrorResponse('Error processing request', error);
   }
-});
+}
 
 /**
- * Get current agent context
+ * Handle context request
  */
-router.get('/api/agent/context', async (request: Request, env: any) => {
+async function handleContextRequest(request: Request, env: any): Promise<Response> {
   try {
+    // Get session ID from query params
     const url = new URL(request.url);
     const sessionId = url.searchParams.get('sessionId');
     
     if (!sessionId) {
-      return createJsonResponse({
-        status: 'error',
-        message: 'sessionId is required',
-      }, 400);
+      return createErrorResponse('Missing sessionId parameter', null);
     }
     
-    const contextManager = await import('../agent-service/context-manager');
-    const context = await contextManager.getContext(env, { sessionId });
+    // Get context
+    const context = await agentService.getContext(env, sessionId);
     
+    // Return context
     return createJsonResponse({
       status: 'success',
-      message: 'Context retrieved successfully',
-      data: { context },
+      data: {
+        context,
+      },
     });
   } catch (error) {
+    console.error('Error getting context:', error);
     return createErrorResponse('Error getting context', error);
   }
-});
+}
 
 /**
- * Get framework metrics
+ * Handle feedback request
  */
-router.get('/api/monitoring/metrics', async (request: Request, env: any) => {
+async function handleFeedbackRequest(request: Request, env: any): Promise<Response> {
   try {
-    const url = new URL(request.url);
-    const category = url.searchParams.get('category') || 'system';
-    const limitParam = url.searchParams.get('limit');
-    const limit = limitParam ? parseInt(limitParam, 10) : 10;
+    if (request.method === 'POST') {
+      // Handle POST request (submit feedback)
+      const body = await request.json() as { 
+        sessionId?: string;
+        requestId?: string;
+        score?: number | string;
+        comment?: string;
+      };
+      
+      // Validate required fields
+      if (!body.sessionId) {
+        return createErrorResponse('Missing sessionId parameter', null);
+      }
+      
+      if (body.score === undefined) {
+        return createErrorResponse('Missing score parameter', null);
+      }
+      
+      // Convert score to number if it's a string
+      const score = typeof body.score === 'string' ? parseFloat(body.score) : body.score;
+      
+      // Create feedback entry
+      const feedback = {
+        sessionId: body.sessionId,
+        requestId: body.requestId || uuidv4(),
+        score,
+        comment: body.comment || '',
+        timestamp: Date.now(),
+      };
+      
+      // Store feedback
+      await agentService.storeFeedback(env, feedback);
+      
+      // Return success
+      return createJsonResponse({
+        status: 'success',
+        message: 'Feedback submitted',
+        data: {
+          feedback,
+        },
+      });
+    } else {
+      // Handle GET request (get feedback)
+      const url = new URL(request.url);
+      const sessionId = url.searchParams.get('sessionId');
+      
+      if (!sessionId) {
+        return createErrorResponse('Missing sessionId parameter', null);
+      }
+      
+      // Get feedback
+      const feedback = await agentService.getFeedback(env, sessionId);
+      
+      // Return feedback
+      return createJsonResponse({
+        status: 'success',
+        data: {
+          feedback,
+        },
+      });
+    }
+  } catch (error) {
+    console.error('Error handling feedback:', error);
+    return createErrorResponse('Error handling feedback', error);
+  }
+}
+
+/**
+ * Handle feedback analysis request
+ */
+async function handleFeedbackAnalysisRequest(request: Request, env: any): Promise<Response> {
+  try {
+    // Get all feedback
+    const allFeedback = await agentService.getAllFeedback(env);
     
-    const monitoring = await import('../monitoring/monitoring-system');
-    const metrics = await monitoring.getMetrics(env, category, limit);
+    if (!allFeedback || allFeedback.length === 0) {
+      return createJsonResponse({
+        status: 'success',
+        data: {
+          analysis: {
+            count: 0,
+            averageScore: 0,
+            positiveCount: 0,
+            neutralCount: 0,
+            negativeCount: 0,
+          },
+        },
+      });
+    }
     
+    // Calculate metrics
+    const count = allFeedback.length;
+    let totalScore = 0;
+    let positiveCount = 0;
+    let neutralCount = 0;
+    let negativeCount = 0;
+    
+    for (const feedback of allFeedback) {
+      totalScore += feedback.score;
+      
+      if (feedback.score > 3.5) {
+        positiveCount++;
+      } else if (feedback.score < 2.5) {
+        negativeCount++;
+      } else {
+        neutralCount++;
+      }
+    }
+    
+    const averageScore = totalScore / count;
+    
+    // Return analysis
     return createJsonResponse({
       status: 'success',
-      message: 'Metrics retrieved successfully',
-      data: { metrics },
+      data: {
+        analysis: {
+          count,
+          averageScore,
+          positiveCount,
+          neutralCount,
+          negativeCount,
+        },
+      },
     });
   } catch (error) {
-    return createErrorResponse('Error getting metrics', error);
+    console.error('Error analyzing feedback:', error);
+    return createErrorResponse('Error analyzing feedback', error);
   }
-});
+}
 
 /**
  * Create a JSON response
  */
-function createJsonResponse(data: CommandResponse, status: number = 200): Response {
+function createJsonResponse(data: any, status: number = 200): Response {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
@@ -351,11 +441,10 @@ function createJsonResponse(data: CommandResponse, status: number = 200): Respon
 /**
  * Create an error response
  */
-function createErrorResponse(message: string, error: any, status: number = 500): Response {
-  console.error(`${message}:`, error);
-  
+function createErrorResponse(message: string, error: any, status: number = 400): Response {
   return createJsonResponse({
     status: 'error',
-    message: `${message}: ${error instanceof Error ? error.message : String(error)}`,
+    message,
+    error: error ? String(error) : undefined,
   }, status);
 } 

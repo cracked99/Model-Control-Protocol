@@ -23,31 +23,21 @@ export interface RuleResult {
 export interface Rule {
   id: string;
   name: string;
-  description?: string;
-  type?: RuleType;
+  type: string;
   priority: number;
-  content?: string;
-  metadata?: {
-    version: string;
-    lastUpdated: string;
-    dependencies: string[];
-    triggers: string[];
-  };
-  execute: (context: RuleContext) => Promise<RuleResult>;
+  description?: string;
+  condition: (request: AgentRequest, context: any) => boolean;
+  action: (request: AgentRequest, context: any) => Promise<any>;
 }
 
 // Context types
 export interface Context {
-  id: string;
   sessionId: string;
-  created: string;
-  lastUpdated: string;
+  userId: string;
   data: Record<string, any>;
-  metadata: {
-    compressionLevel: number;
-    originalSize: number;
-    compressedSize: number;
-  };
+  metadata: Record<string, any>;
+  created: number;
+  updated: number;
 }
 
 // Metrics types
@@ -62,8 +52,9 @@ export interface Metrics {
 export interface AgentRequest {
   id: string;
   sessionId: string;
-  content: string;
-  metadata?: Record<string, any>;
+  userId: string;
+  command: string;
+  metadata: Record<string, any>;
 }
 
 export interface AgentResponse {
@@ -95,18 +86,43 @@ export interface FrameworkStatus {
 // Command response
 export interface CommandResponse {
   status: 'success' | 'error';
-  message: string;
+  message?: string;
   data?: any;
 }
 
 // Environment configuration
 export interface FrameworkConfig {
-  settings: {
-    initialization: {
-      enabled: boolean;
-    };
-    framework: {
-      enableMetrics: boolean;
-    };
+  enabled: boolean;
+  version: string;
+  monitoring: {
+    enabled: boolean;
+    interval: number;
   };
+  rules: {
+    core: string[];
+    enhancement: string[];
+    onDemand: string[];
+  };
+  feedback: {
+    enabled: boolean;
+    storageLimit: number;
+  };
+}
+
+// Rule Set
+export interface RuleSet {
+  id: string;
+  name: string;
+  type: 'core' | 'enhancement' | 'on-demand';
+  status: 'active' | 'inactive';
+  ruleCount: number;
+}
+
+// Feedback
+export interface Feedback {
+  sessionId: string;
+  requestId: string;
+  score: number;
+  comment: string;
+  timestamp: number;
 } 
