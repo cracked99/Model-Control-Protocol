@@ -281,11 +281,13 @@ export const accessibilityRule: Rule = {
   
   condition: (request: AgentRequest, context: any): boolean => {
     // Check if this is a code-related request
-    return request.command?.includes('code') || 
-           request.command?.includes('component') ||
-           request.command?.includes('html') ||
-           request.command?.includes('ui') ||
-           request.command?.includes('interface');
+    return Boolean(
+      request.command?.includes('code') || 
+      request.command?.includes('component') ||
+      request.command?.includes('html') ||
+      request.command?.includes('ui') ||
+      request.command?.includes('interface')
+    );
   },
   
   action: async (request: AgentRequest, context: any): Promise<AgentRequest> => {
@@ -340,9 +342,11 @@ export const maintainabilityRule: Rule = {
   
   condition: (request: AgentRequest, context: any): boolean => {
     // Check if the request is code-related
-    return request.command?.includes('code') || 
-           request.command?.includes('function') ||
-           request.command?.includes('class');
+    return Boolean(
+      request.command?.includes('code') || 
+      request.command?.includes('function') ||
+      request.command?.includes('class')
+    );
   },
   
   action: async (request: AgentRequest, context: any): Promise<AgentRequest> => {
