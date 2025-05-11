@@ -8,7 +8,8 @@
 		"format": "biome format --write",
 		"lint:fix": "biome lint --fix",
 		"start": "wrangler dev",
-		"cf-typegen": "wrangler types"
+		"cf-typegen": "wrangler types",
+		"dashboard": "ts-node src/cli-dashboard.ts"
 	},
 	"devDependencies": {
 		"@cloudflare/workers-types": "^4.20250510.0",
@@ -22,6 +23,7 @@
 		"itty-router": "^4.0.27",
 		"lz-string": "^1.5.0",
 		"uuid": "^9.0.1",
-		"zod": "^3.24.4"
+		"zod": "^3.24.4",
+		"blessed": "^0.1.81"
 	}
 }

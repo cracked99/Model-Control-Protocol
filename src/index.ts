@@ -2,6 +2,7 @@ import { McpAgent } from "agents/mcp";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { Router } from "itty-router";
+import { spawn, execSync } from 'child_process';
 
 // Import framework components
 import * as initSystem from "./framework/core/init-system";
@@ -121,6 +122,45 @@ export class MyMCP extends McpAgent {
 				};
 			}
 		);
+
+		// Activate Dashboard tool
+		this.server.tool(
+			"activateDashboard",
+			{},
+			async () => {
+				try {
+					// Check if dashboard is already running
+					let alreadyRunning = false;
+					try {
+						// Use pgrep to check for the dashboard process
+						const result = execSync("pgrep -f 'ts-node src/cli-dashboard.ts'", { stdio: 'pipe' }).toString();
+						if (result && result.trim().length > 0) alreadyRunning = true;
+					} catch (e) {
+						// pgrep returns non-zero if not found, which is fine
+						alreadyRunning = false;
+					}
+					if (alreadyRunning) {
+						return {
+							content: [{ type: 'text', text: '[Dashboard] Dashboard is already running.' }],
+						};
+					} else {
+						// Start the dashboard in the background
+						spawn('npm', ['run', 'dashboard'], {
+							detached: true,
+							stdio: 'ignore',
+							cwd: process.cwd(),
+						}).unref();
+						return {
+							content: [{ type: 'text', text: '[Dashboard] Agentic Framework dashboard is now active in your terminal.' }],
+						};
+					}
+				} catch (error) {
+					return {
+						content: [{ type: 'text', text: `[Dashboard] Error starting dashboard: ${error instanceof Error ? error.message : String(error)}` }],
+					};
+				}
+			}
+		);
 	}
 }
 
@@ -142,6 +182,10 @@ router.all('*', (request, env, ctx) => {
 	}
 
 	if (url.pathname === "/mcp") {
+		// Handle GET /mcp for SSE compatibility
+		if (request.method === 'GET') {
+			return new Response('MCP server is running', { status: 200 });
+		}
 		// Create MCP handler with proper headers handling
 		const mcpHandler = MyMCP.serve("/mcp");
 		

@@ -2,16 +2,17 @@
 
 The Agentic Framework MCP (Model Control Protocol) Server is a comprehensive system designed to enhance AI agent capabilities through rule-based processing, monitoring, and context management.
 
-## Implementation Status
+## Implementation Status (Updated)
 
-The MCP Server implementation is now functional with the following components:
+The MCP Server is now highly functional, with the following components:
 
 - **Core Framework**: Basic framework structure with initialization system ✅
 - **Rule Engine**: Rule processing, loading, and execution mechanisms ✅
 - **Agent Service**: Agent request handling and response processing ✅
 - **Monitoring System**: Performance metrics collection and analysis ✅
 - **Context Management**: Agent context retention and processing ✅
-- **API System**: RESTful API endpoints for external communication ✅
+- **API System**: RESTful API endpoints for external communication ✅ (Core endpoints implemented; see below)
+- **WebSocket/Event Streaming**: ❌ Not yet implemented (planned for future release)
 
 ### Rule Sets Implemented
 
@@ -20,6 +21,7 @@ The MCP Server implementation is now functional with the following components:
 - **Context Retention**: Rules for managing context retention ✅
 - **Code Quality Development**: Rules for ensuring high-quality code development ✅
 - **Feedback Integration**: Rules for integrating user feedback ✅
+- **Enhancement Rules**: General enhancement rules ✅
 
 ## Getting Started
 
@@ -101,7 +103,7 @@ To integrate the MCP Server with Cursor IDE, follow these steps:
      -d '{"jsonrpc":"2.0","method":"mcp.submit","params":{"input":"Check framework status","tools":[{"name":"framework","input":{"command":"status","args":[]}}]},"id":3}'
    ```
 
-## API Endpoints
+## API Endpoints (Current Coverage)
 
 ### Framework Management
 
@@ -124,6 +126,8 @@ To integrate the MCP Server with Cursor IDE, follow these steps:
 - `GET /api/monitoring/performance` - Get performance metrics
 - `GET /api/monitoring/alerts` - Get active alerts
 
+> **Note:** WebSocket and event streaming endpoints are not yet implemented. These are planned for a future release.
+
 ## Framework Commands
 
 The framework includes a command system for managing the MCP server:
@@ -136,13 +140,26 @@ The framework includes a command system for managing the MCP server:
 - `/framework list`: Lists all available rule sets
 - `/framework reset`: Resets framework to default state
 
-## Testing
+## Testing & Integration Status
 
-Run the test script to verify the framework functionality:
+A test script is provided to verify the core framework functionality and API endpoints:
 
 ```bash
 node test-framework.js
 ```
+
+The test script covers:
+- Framework initialization
+- Status endpoint
+- Rule listing
+- Agent request processing
+- Monitoring metrics
+- Framework command tool via MCP endpoint
+
+> **Integration Status:**
+> - All core API endpoints are tested and functional.
+> - Rule engine, agent service, and monitoring are fully integrated.
+> - WebSocket/event streaming and advanced rule sets are not yet covered by tests (planned).
 
 ## Next Steps
 

@@ -55,6 +55,11 @@
           "description": "Second operand"
         }
       }
+    },
+    {
+      "name": "activateDashboard",
+      "description": "Ensures the Agentic Framework dashboard is running and visible in the terminal.",
+      "parameters": {}
     }
   ],
   "authentication": {
