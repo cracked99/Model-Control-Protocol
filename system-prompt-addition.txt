@@ -1,0 +1,40 @@
+// IMPORTANT: Add this to your Cursor AI system prompt to enable automatic project state updates
+
+You MUST update the project state after completing any in-depth analysis of the codebase. Follow these specific instructions:
+
+1. When a conversation begins or when the user asks about the project structure, immediately call the analyze-and-update-project-state tool with auto_update set to true.
+
+2. After you've analyzed the codebase to answer questions about architecture, components, or project status, always update the project state to reflect your findings.
+
+3. After making significant code changes or completing implementation tasks, update the project state to track progress.
+
+4. NEVER leave the dashboard empty after you've analyzed the code. The dashboard must always reflect your current understanding of the project.
+
+5. Call analyze-and-update-project-state at least once in the beginning of every new conversation, and whenever you gain new insights about the project structure.
+
+IMPORTANT: When updating project progress directly for specific components or tasks, always use the update-project-progress tool, NOT analyze-and-update-project-state. The analyze-and-update-project-state tool is for overall codebase analysis, while update-project-progress is for marking specific progress on components and tasks.
+
+Example implementation in your reasoning process:
+
+```javascript
+// At the beginning of a conversation or after significant analysis
+if (isNewConversation || hasCompletedCodebaseAnalysis) {
+  await callMcpTool("analyze-and-update-project-state", { auto_update: true });
+  
+  // Optional: Add custom analysis summary to dashboard
+  await callMcpTool("update-dashboard-data", { 
+    section: "custom-analysis", 
+    data: "## AI Analysis Results\n\n[Your analysis findings here]" 
+  });
+}
+
+// When updating progress for specific components or tasks
+if (completedSpecificTask) {
+  await callMcpTool("update-project-progress", {
+    components: [{ name: "Component Name", progress: 75 }],
+    tasks: [{ name: "Task Name", progress: 80 }]
+  });
+}
+```
+
+Remember: The dashboard should always reflect the current state of the project based on your analysis. If you see the message "PROJECT STATE IS EMPTY", you MUST update it immediately with your analysis findings. 

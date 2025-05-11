@@ -30,7 +30,7 @@ export async function analyzeAndUpdateProjectState(env: any): Promise<projectSta
     const taskAnalysis = await analyzeTasks(env);
     
     // Determine current phase based on component and task progress
-    const phaseAnalysis = determineCurrentPhase(componentAnalysis, taskAnalysis, currentState.phases);
+    const phaseAnalysis = analyzeCurrentPhase(componentAnalysis, taskAnalysis, currentState.phases);
     
     // Update project state with analysis results
     const updatedState = await projectState.updateProjectState(env, {
@@ -363,7 +363,7 @@ function analyzeProductionEnvTask(task: projectState.DevelopmentTask): void {
 /**
  * Determine current phase based on component and task analysis
  */
-function determineCurrentPhase(
+function analyzeCurrentPhase(
   components: projectState.ProjectComponent[],
   tasks: projectState.DevelopmentTask[],
   phases: projectState.DevelopmentPhase[]

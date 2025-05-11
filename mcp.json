@@ -45,6 +45,17 @@
       }
     },
     {
+      "name": "analyze-and-update-project-state",
+      "description": "Automatically analyzes the project and updates the project state with the findings. This tool is designed to be called by the system prompt to ensure the dashboard always reflects the current state of the project.",
+      "parameters": {
+        "auto_update": {
+          "type": "boolean",
+          "description": "Whether to automatically update the project state with analysis results",
+          "default": true
+        }
+      }
+    },
+    {
       "name": "analyzeCode",
       "description": "Analyzes code for quality issues and suggests improvements. Checks for security vulnerabilities, performance issues, maintainability problems, and missing error handling.",
       "parameters": {

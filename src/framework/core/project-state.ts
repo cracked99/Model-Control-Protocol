@@ -50,155 +50,11 @@ export interface ProjectState {
 
 // Initial project state
 const initialProjectState: ProjectState = {
-  components: [
-    {
-      name: 'Core Framework',
-      status: 'completed',
-      progress: 100,
-      description: 'Basic framework structure with initialization system'
-    },
-    {
-      name: 'Rule Engine',
-      status: 'completed',
-      progress: 100,
-      description: 'Rule processing, loading, and execution mechanisms'
-    },
-    {
-      name: 'Agent Service',
-      status: 'completed',
-      progress: 100,
-      description: 'Agent request handling and response processing'
-    },
-    {
-      name: 'Monitoring System',
-      status: 'completed',
-      progress: 100,
-      description: 'Performance metrics collection and analysis'
-    },
-    {
-      name: 'Context Management',
-      status: 'completed',
-      progress: 100,
-      description: 'Agent context retention and processing'
-    },
-    {
-      name: 'API System',
-      status: 'in-progress',
-      progress: 65,
-      description: 'RESTful API endpoints for external communication'
-    }
-  ],
-  ruleSets: [
-    {
-      name: 'Code Quality Development',
-      status: 'active',
-      rules: ['Testability', 'Security', 'Performance', 'Error Handling', 'Accessibility', 'Maintainability'],
-      description: 'Rules for ensuring high-quality code development'
-    },
-    {
-      name: 'Core Agent Behavior',
-      status: 'active',
-      rules: ['Conciseness', 'Helpfulness', 'Accuracy'],
-      description: 'Fundamental agent behavior rules'
-    },
-    {
-      name: 'Rule Prioritization',
-      status: 'active',
-      rules: ['Effectiveness Tracking', 'Priority Adjustment'],
-      description: 'Rules for prioritizing rule execution'
-    },
-    {
-      name: 'Context Retention',
-      status: 'active',
-      rules: ['Memory Management', 'Context Summarization', 'Context Compression'],
-      description: 'Rules for managing context retention'
-    },
-    {
-      name: 'Feedback Integration',
-      status: 'active',
-      rules: ['Feedback-Based Adjustment', 'Context-Based Prioritization'],
-      description: 'Rules for integrating user feedback'
-    },
-    {
-      name: 'Enhancement Rules',
-      status: 'active',
-      rules: ['Important Information Extraction', 'Code Formatting', 'Explanation Clarity'],
-      description: 'General enhancement rules'
-    }
-  ],
-  tasks: [
-    {
-      name: 'Implement REST API endpoints',
-      status: 'in-progress',
-      progress: 70,
-      description: 'Create RESTful API endpoints for external communication'
-    },
-    {
-      name: 'Add WebSocket support',
-      status: 'in-progress',
-      progress: 40,
-      description: 'Add WebSocket support for real-time updates'
-    },
-    {
-      name: 'Complete API documentation',
-      status: 'in-progress',
-      progress: 30,
-      description: 'Document API endpoints'
-    },
-    {
-      name: 'Develop test suite',
-      status: 'planned',
-      progress: 0,
-      description: 'Create comprehensive test suite'
-    },
-    {
-      name: 'Perform load testing',
-      status: 'planned',
-      progress: 0,
-      description: 'Test system under load'
-    },
-    {
-      name: 'Configure production environment',
-      status: 'planned',
-      progress: 0,
-      description: 'Set up production environment'
-    }
-  ],
-  phases: [
-    {
-      id: 1,
-      name: 'Core Infrastructure Setup',
-      status: 'completed',
-      components: ['Core Framework'],
-      tasks: ['Configure MCP server environment', 'Create framework directory structure', 'Implement initialization system'],
-      description: 'Setting up the core infrastructure for the Agentic Framework'
-    },
-    {
-      id: 2,
-      name: 'Rule System Implementation',
-      status: 'completed',
-      components: ['Rule Engine', 'Context Management'],
-      tasks: ['Implement rule loading/unloading mechanisms', 'Create rule prioritization system', 'Develop context management system'],
-      description: 'Implementing the rule system and context management'
-    },
-    {
-      id: 3,
-      name: 'Agent Integration',
-      status: 'current',
-      components: ['Agent Service', 'API System'],
-      tasks: ['Implement agent communication protocol', 'Create REST API endpoints', 'Add WebSocket support'],
-      description: 'Integrating agent services and creating API endpoints'
-    },
-    {
-      id: 4,
-      name: 'Monitoring & Optimization',
-      status: 'upcoming',
-      components: ['Monitoring System'],
-      tasks: ['Develop comprehensive test suite', 'Perform load testing', 'Configure production environment'],
-      description: 'Optimizing performance and preparing for deployment'
-    }
-  ],
-  currentPhase: 3,
+  components: [],
+  ruleSets: [],
+  tasks: [],
+  phases: [],
+  currentPhase: 0,
   lastUpdated: Date.now()
 };
 
@@ -509,6 +365,16 @@ export async function updateProjectProgress(
           status: update.progress >= 100 ? 'completed' : 'in-progress'
         };
         console.log(`Updated component ${update.name} to ${update.progress}% (${updatedComponents[componentIndex].status})`);
+      } else {
+        // Component doesn't exist, create it
+        console.log(`Creating new component ${update.name} with ${update.progress}% progress`);
+        const newComponent: ProjectComponent = {
+          name: update.name,
+          progress: update.progress,
+          status: update.progress >= 100 ? 'completed' : (update.progress > 0 ? 'in-progress' : 'planned'),
+          description: `Auto-generated component: ${update.name}`
+        };
+        updatedComponents.push(newComponent);
       }
     }
     
@@ -523,11 +389,37 @@ export async function updateProjectProgress(
           status: update.progress >= 100 ? 'completed' : update.progress > 0 ? 'in-progress' : 'planned'
         };
         console.log(`Updated task ${update.name} to ${update.progress}% (${updatedTasks[taskIndex].status})`);
+      } else {
+        // Task doesn't exist, create it
+        console.log(`Creating new task ${update.name} with ${update.progress}% progress`);
+        const newTask: DevelopmentTask = {
+          name: update.name,
+          progress: update.progress,
+          status: update.progress >= 100 ? 'completed' : (update.progress > 0 ? 'in-progress' : 'planned'),
+          description: `Auto-generated task: ${update.name}`
+        };
+        updatedTasks.push(newTask);
       }
     }
     
+    // Make sure we have at least one phase if phases array is empty
+    let phasesToUse = currentState.phases;
+    if (phasesToUse.length === 0) {
+      // Create a default phase structure
+      phasesToUse = [
+        {
+          id: 1,
+          name: 'Phase 1: Setup',
+          status: 'current',
+          components: updatedComponents.map(c => c.name),
+          tasks: updatedTasks.map(t => t.name),
+          description: 'Initial project setup phase'
+        }
+      ];
+    }
+    
     // Update current phase automatically based on task progress
-    const phaseUpdates = determineCurrentPhase(updatedComponents, updatedTasks, currentState.phases);
+    const phaseUpdates = determineCurrentPhase(updatedComponents, updatedTasks, phasesToUse);
     
     // Update state with all changes
     return updateProjectState(env, {
@@ -552,6 +444,20 @@ function determineCurrentPhase(
 ): { currentPhaseId: number; updatedPhases: DevelopmentPhase[] } {
   // Clone phases for modification
   const updatedPhases = [...phases];
+  
+  // If no phases exist, create a default one
+  if (updatedPhases.length === 0) {
+    const defaultPhase: DevelopmentPhase = {
+      id: 1,
+      name: 'Phase 1: Setup',
+      status: 'current',
+      components: components.map(c => c.name),
+      tasks: tasks.map(t => t.name),
+      description: 'Initial project setup phase'
+    };
+    updatedPhases.push(defaultPhase);
+    return { currentPhaseId: 1, updatedPhases };
+  }
   
   // Calculate completion percentage for each phase
   const phaseProgress = updatedPhases.map(phase => {
@@ -607,7 +513,7 @@ function determineCurrentPhase(
     const currentPhase = updatedPhases.find(p => p.id === currentPhaseId);
     if (currentPhase) {
       currentPhase.status = 'current' as const;
-    } else {
+    } else if (updatedPhases.length > 0) {
       // Fallback to first phase if none match
       updatedPhases[0].status = 'current' as const;
       currentPhaseId = updatedPhases[0].id;
