@@ -71,6 +71,10 @@ export async function displayDashboardStatus(env: any): Promise<string> {
       }
     }
     
+    // Check if project state is empty
+    const state = await projectState.getProjectState(env);
+    const isEmptyState = state.components.length === 0 && state.tasks.length === 0;
+    
     // Get dynamic project overview
     const projectOverview = await generateDynamicProjectOverview(env);
     
@@ -106,9 +110,14 @@ ${rulesListFormatted}
 **Performance Metrics**:
 - Rule Calls: ${metrics.data.ruleCalls || 0}
 - Avg Response Time: ${Math.round(metrics.data.responseTimes?.avg || 0)}ms
-- Memory Usage: ${metrics.data.memory?.used || 0}MB
+- Memory Usage: ${metrics.data.memory?.used || 0}MB`;
 
-📋 **PROJECT OVERVIEW**
+    // Add empty state notification if applicable
+    if (isEmptyState) {
+      dashboardOutput += `\n\n⚠️ **PROJECT STATE IS EMPTY**\nWaiting for Cursor AI Agent to analyze and populate project information.`;
+    }
+
+    dashboardOutput += `\n\n📋 **PROJECT OVERVIEW**
 
 ${projectOverview}
 
@@ -125,7 +134,7 @@ ${currentPhase}`;
 
     // Add update time and analysis info
     dashboardOutput += `\n\n⏱️ **Last Updated**: ${new Date().toLocaleString()}
-📊 **AI Analysis**: ${lastAnalysis > 0 ? `Last analyzed ${formatTimeAgo(lastAnalysis)}` : 'Analyzing now...'}`;
+📊 **AI Analysis**: ${lastAnalysis > 0 ? `Last analyzed ${formatTimeAgo(lastAnalysis)}` : 'Waiting for initial analysis...'}`;
     
     return dashboardOutput;
   } catch (error) {
@@ -173,6 +182,11 @@ async function generateDynamicProjectOverview(env: any): Promise<string> {
     
     // Get current project state
     const state = await projectState.getProjectState(env);
+    
+    // Check if the project state is empty (no components defined yet)
+    if (state.components.length === 0) {
+      return 'Project state is currently empty. Waiting for AI Agent to analyze and provide project information.';
+    }
     
     let overview = '**Implementation Status**:\n';
     
@@ -223,8 +237,8 @@ async function generateDynamicProjectOverview(env: any): Promise<string> {
   } catch (error) {
     console.error('Error generating dynamic project overview:', error);
     
-    // Fallback to hardcoded overview
-    return getHardcodedProjectOverview();
+    // Return empty state message instead of hardcoded fallback
+    return 'Project overview unavailable. Waiting for AI Agent to analyze the project.';
   }
 }
 
@@ -243,10 +257,15 @@ async function generateCurrentPhaseInfo(env: any): Promise<string> {
     // Get current project state
     const state = await projectState.getProjectState(env);
     
+    // Check if the project state is empty (no phases defined yet)
+    if (state.phases.length === 0) {
+      return 'No development phases defined yet. Waiting for AI Agent to analyze project structure.';
+    }
+    
     // Find current phase
     const currentPhase = state.phases.find(p => p.status === 'current');
     if (!currentPhase) {
-      return 'No current phase defined.';
+      return 'No current phase defined. Waiting for phase assignment.';
     }
     
     // Get completed components for this phase
@@ -280,8 +299,8 @@ async function generateCurrentPhaseInfo(env: any): Promise<string> {
   } catch (error) {
     console.error('Error generating current phase info:', error);
     
-    // Fallback to hardcoded phase info
-    return '**Current Phase**: Development in progress';
+    // Return empty state message instead of hardcoded fallback
+    return 'Development phase information unavailable. Waiting for AI Agent analysis.';
   }
 }
 
@@ -293,6 +312,11 @@ function calculatePhaseProgress(
   components: projectState.ProjectComponent[],
   tasks: projectState.DevelopmentTask[]
 ): number {
+  // Check for empty arrays to avoid division by zero
+  if (components.length === 0 && tasks.length === 0) {
+    return 0;
+  }
+  
   // Calculate component completion
   const componentProgress = components.length > 0
     ? components.reduce((sum, c) => sum + c.progress, 0) / components.length
@@ -303,6 +327,15 @@ function calculatePhaseProgress(
     ? tasks.reduce((sum, t) => sum + t.progress, 0) / tasks.length
     : 0;
   
+  // If we have only components or only tasks, don't use the weighted average
+  if (components.length === 0) {
+    return Math.round(taskProgress);
+  }
+  
+  if (tasks.length === 0) {
+    return Math.round(componentProgress);
+  }
+  
   // Weighted average with more weight on tasks
   return Math.round((componentProgress * 0.4) + (taskProgress * 0.6));
 }
@@ -311,6 +344,11 @@ function calculatePhaseProgress(
  * Calculate project health based on the project state
  */
 function getProjectHealth(state: projectState.ProjectState): { status: string; icon: string } {
+  // Check if the project state is empty
+  if (state.components.length === 0 || state.tasks.length === 0) {
+    return { status: 'Not Available - Awaiting Analysis', icon: '⏳' };
+  }
+
   // Calculate total progress across all components
   const totalProgress = state.components.reduce((sum, component) => sum + component.progress, 0);
   const averageProgress = totalProgress / state.components.length;
@@ -341,35 +379,6 @@ function getProjectHealth(state: projectState.ProjectState): { status: string; i
   }
   
   return { status: 'On Track', icon: '✅' };
-}
-
-/**
- * Provide a hardcoded project overview as fallback
- */
-function getHardcodedProjectOverview(): string {
-  return `**Implementation Status**:
-- Completed: 5 components (Core Framework, Rule Engine, Agent Service, Monitoring System, Context Management)
-- In Progress: 1 component (API System)
-- Rule Sets Implemented: 6 (Code Quality, Core Agent Behavior, Rule Prioritization, Context Retention, Feedback Integration, Enhancement Rules)
-
-**Code Quality Module**:
-- Implemented Rules: Security, Performance, Accessibility, Maintainability, Testability, Error Handling
-
-**Features Complete**:
-- Rule Engine with dynamic loading/unloading
-- Framework Commands System
-- Context Management with compression
-- Monitoring and Metrics Collection
-- Dashboard Visualization
-- Rule Prioritization System
-
-**Next Steps**:
-1. API System Completion - Complete RESTful API endpoints and WebSocket support
-2. Integration Testing - Develop test suite and perform load testing
-3. Documentation - Complete user documentation and developer guides
-4. Deployment - Configure production environment and set up CI/CD pipeline
-
-**Project Health**: ✅ On Track`;
 }
 
 /**

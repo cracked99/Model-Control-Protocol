@@ -6,6 +6,7 @@ import { CommandResponse, AgentRequest } from '../types';
 import * as initSystem from '../core/init-system';
 import * as monitoringSystem from '../monitoring/monitoring-system';
 import * as agentService from '../agent/agent-service';
+import * as projectState from '../core/project-state';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -36,6 +37,8 @@ export async function handleRequest(request: Request, env: any): Promise<Respons
       return handleListRulesRequest(request, env);
     } else if (path === '/api/framework/reset') {
       return handleResetRequest(request, env);
+    } else if (path === '/api/framework/reset-project-state') {
+      return handleResetProjectStateRequest(request, env);
     } else if (path === '/api/agent/process') {
       return handleProcessRequest(request, env);
     } else if (path === '/api/agent/context') {
@@ -243,7 +246,7 @@ async function handleProcessRequest(request: Request, env: any): Promise<Respons
     const agentRequest: AgentRequest = {
       id: body.id || uuidv4(),
       sessionId: body.sessionId || uuidv4(),
-      userId: body.userId || 'anonymous',
+      content: body.content || '',
       command: body.command || '',
       metadata: body.metadata && typeof body.metadata === 'object' ? body.metadata : {},
     };
@@ -423,6 +426,35 @@ async function handleFeedbackAnalysisRequest(request: Request, env: any): Promis
   } catch (error) {
     console.error('Error analyzing feedback:', error);
     return createErrorResponse('Error analyzing feedback', error);
+  }
+}
+
+/**
+ * Handle reset project state request
+ */
+async function handleResetProjectStateRequest(request: Request, env: any): Promise<Response> {
+  try {
+    // Create an empty project state
+    const emptyState: projectState.ProjectState = {
+      components: [],
+      ruleSets: [],
+      tasks: [],
+      phases: [],
+      currentPhase: 0,
+      lastUpdated: Date.now()
+    };
+    
+    // Update project state with empty state
+    await projectState.updateProjectState(env, emptyState);
+    
+    // Return success result
+    return createJsonResponse({
+      status: 'success',
+      message: 'Project state reset to empty state',
+    });
+  } catch (error) {
+    console.error('Error resetting project state:', error);
+    return createErrorResponse('Error resetting project state', error);
   }
 }
 

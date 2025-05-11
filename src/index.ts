@@ -146,6 +146,128 @@ export class MyMCP extends McpAgent {
 			}
 		);
 
+		// Analyze project and update state tool - for system prompt
+		this.server.tool(
+			"analyze-and-update-project-state",
+			{
+				auto_update: z.boolean().default(true).describe("Whether to automatically update the project state with analysis results")
+			},
+			async ({ auto_update }) => {
+				try {
+					console.log('Running project analysis and state update via system prompt...');
+					
+					// First, analyze the project
+					const analysisResult = await projectAnalyzer.analyzeAndUpdateProjectState(globalEnv);
+					
+					// Update the last analysis timestamp
+					await globalEnv.FRAMEWORK_KV?.put('project:last_analysis', Date.now().toString());
+					
+					// Prepare components from analysis
+					const components = analysisResult.components.map(component => ({
+						name: component.name,
+						status: component.status,
+						progress: component.progress,
+						description: component.description
+					}));
+					
+					// Prepare tasks from analysis
+					const tasks = analysisResult.tasks.map(task => ({
+						name: task.name,
+						status: task.status,
+						progress: task.progress,
+						description: task.description
+					}));
+					
+					// Prepare phases from analysis
+					const phases = analysisResult.phases.map(phase => ({
+						id: phase.id,
+						name: phase.name,
+						status: phase.status,
+						components: phase.components,
+						tasks: phase.tasks,
+						description: phase.description
+					}));
+					
+					// Rule sets would be maintained as-is
+					const ruleSets = analysisResult.ruleSets;
+					
+					// Create project state object
+					const newProjectState = {
+						components,
+						ruleSets,
+						tasks,
+						phases,
+						currentPhase: analysisResult.currentPhase,
+						lastUpdated: Date.now()
+					};
+					
+					// Update the project state if auto_update is true
+					if (auto_update) {
+						// Import project state functions
+						const { updateProjectState } = await import('./framework/core/project-state');
+						
+						// Update the project state
+						await updateProjectState(globalEnv, newProjectState);
+						console.log('Project state updated automatically from analysis');
+						
+						// Refresh the dashboard if active
+						if (dashboardActive) {
+							await agentService.refreshDashboard(globalEnv);
+						}
+					}
+					
+					// Generate summary of what was found
+					const completedComponents = components.filter(c => c.status === 'completed');
+					const inProgressComponents = components.filter(c => c.status === 'in-progress');
+					const completedTasks = tasks.filter(t => t.status === 'completed');
+					const inProgressTasks = tasks.filter(t => t.status === 'in-progress');
+					const currentPhase = phases.find(p => p.id === analysisResult.currentPhase);
+					
+					let resultText = `## Project Analysis and State Update Complete\n\n`;
+					resultText += `Analysis completed at: ${new Date().toLocaleString()}\n\n`;
+					resultText += `**Components**: ${completedComponents.length} completed, ${inProgressComponents.length} in progress\n`;
+					resultText += `**Tasks**: ${completedTasks.length} completed, ${inProgressTasks.length} in progress\n`;
+					resultText += `**Current Phase**: ${currentPhase?.name || 'Unknown'}\n\n`;
+					resultText += `**Project State Updated**: ${auto_update ? 'Yes ✅' : 'No ❌'}\n\n`;
+					
+					// Show in-progress items
+					if (inProgressComponents.length > 0) {
+						resultText += `**In-Progress Components**:\n`;
+						inProgressComponents.forEach(c => {
+							resultText += `- ${c.name} (${c.progress}%)\n`;
+						});
+						resultText += `\n`;
+					}
+					
+					if (inProgressTasks.length > 0) {
+						resultText += `**In-Progress Tasks**:\n`;
+						inProgressTasks.forEach(t => {
+							resultText += `- ${t.name} (${t.progress}%)\n`;
+						});
+					}
+					
+					// Get updated dashboard after analysis
+					const dashboardStatus = await getChatDashboardStatus(globalEnv);
+					
+					return {
+						content: [
+							{ type: "text", text: resultText },
+							{ type: "text", text: "\n\n" },
+							{ type: "text", text: dashboardStatus }
+						],
+					};
+				} catch (error) {
+					console.error('Error analyzing and updating project state:', error);
+					return {
+						content: [{ 
+							type: "text", 
+							text: `Error analyzing and updating project state: ${error instanceof Error ? error.message : String(error)}` 
+						}],
+					};
+				}
+			}
+		);
+
 		// Code quality analysis tool
 		this.server.tool(
 			"analyzeCode",
@@ -183,8 +305,6 @@ export class MyMCP extends McpAgent {
 				}
 			}
 		);
-
-
 
 		// Framework command tool
 		this.server.tool(
@@ -468,7 +588,6 @@ export class MyMCP extends McpAgent {
 			}
 		);
 		
-
 		// Update project progress tool for agents
 		this.server.tool(
 			"update-project-progress",
@@ -513,6 +632,94 @@ export class MyMCP extends McpAgent {
 						content: [{ 
 							type: "text", 
 							text: `Error updating project progress: ${error instanceof Error ? error.message : String(error)}`
+						}],
+					};
+				}
+			}
+		);
+		
+		// Initialize Project State tool for AI Agent
+		this.server.tool(
+			"initialize-project-state",
+			{
+				components: z.array(
+					z.object({
+						name: z.string().describe("Name of the component"),
+						status: z.enum(['completed', 'in-progress', 'planned']).describe("Component status"),
+						progress: z.number().min(0).max(100).describe("Progress percentage (0-100)"),
+						description: z.string().describe("Description of the component")
+					})
+				).describe("Components to initialize"),
+				ruleSets: z.array(
+					z.object({
+						name: z.string().describe("Name of the rule set"),
+						status: z.enum(['active', 'available', 'in-development']).describe("Rule set status"),
+						rules: z.array(z.string()).describe("Rules in the set"),
+						description: z.string().describe("Description of the rule set")
+					})
+				).describe("Rule sets to initialize"),
+				tasks: z.array(
+					z.object({
+						name: z.string().describe("Name of the task"),
+						status: z.enum(['completed', 'in-progress', 'planned']).describe("Task status"),
+						progress: z.number().min(0).max(100).describe("Progress percentage (0-100)"),
+						description: z.string().describe("Description of the task")
+					})
+				).describe("Tasks to initialize"),
+				phases: z.array(
+					z.object({
+						id: z.number().int().min(1).describe("Phase ID (sequential number)"),
+						name: z.string().describe("Name of the phase"),
+						status: z.enum(['completed', 'current', 'upcoming']).describe("Phase status"),
+						components: z.array(z.string()).describe("Component names associated with this phase"),
+						tasks: z.array(z.string()).describe("Task names associated with this phase"),
+						description: z.string().describe("Description of the phase")
+					})
+				).describe("Development phases to initialize"),
+				currentPhase: z.number().int().min(1).describe("Current phase ID")
+			},
+			async ({ components, ruleSets, tasks, phases, currentPhase }) => {
+				try {
+					console.log(`AI Agent initializing project state with: ${components.length} components, ${ruleSets.length} rule sets, ${tasks.length} tasks, ${phases.length} phases`);
+					
+					// Import project state functions
+					const { updateProjectState } = await import('./framework/core/project-state');
+					
+					// Create a complete project state object
+					const newProjectState = {
+						components,
+						ruleSets,
+						tasks,
+						phases,
+						currentPhase,
+						lastUpdated: Date.now()
+					};
+					
+					// Update the project state
+					const result = await updateProjectState(globalEnv, newProjectState);
+					
+					// Refresh the dashboard if active
+					if (dashboardActive) {
+						await agentService.refreshDashboard(globalEnv);
+					}
+					
+					return {
+						content: [{ 
+							type: "text", 
+							text: `Project state initialized successfully!\n\n` +
+							`- Components: ${components.length}\n` +
+							`- Rule Sets: ${ruleSets.length}\n` +
+							`- Tasks: ${tasks.length}\n` +
+							`- Phases: ${phases.length}\n` +
+							`- Current Phase: ${result.phases.find(p => p.id === result.currentPhase)?.name || `Phase ${result.currentPhase}`}`
+						}],
+					};
+				} catch (error) {
+					console.error('Error initializing project state:', error);
+					return {
+						content: [{ 
+							type: "text", 
+							text: `Error initializing project state: ${error instanceof Error ? error.message : String(error)}`
 						}],
 					};
 				}

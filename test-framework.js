@@ -1,135 +1,20 @@
 /**
- * Test script for the Agentic Framework MCP Server
+ * Test script to demonstrate the agentic framework functionality
  * 
- * This script tests the basic functionality of the framework by making API calls
- * to the server and verifying the responses.
+ * This script shows how an AI agent can analyze a project and 
+ * dynamically populate the project state in the MCP dashboard.
  */
 
-// Run this script with: node test-framework.js
+const SESSION_ID = 'test_session_' + Date.now();
 
-const API_BASE = 'http://localhost:8787';
-const fetch = require('node-fetch');
-
-// MCP server URL
-const MCP_URL = 'http://localhost:8787/mcp';
-// Session ID
-const SESSION_ID = 'cursor_session';
-
-// Execute a framework command
-async function executeFrameworkCommand(command, args = []) {
-  try {
-    const response = await fetch(MCP_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Mcp-Session-Id': SESSION_ID
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'mcp.execute',
-        params: {
-          name: 'framework',
-          input: {
-            command,
-            args
-          }
-        },
-        id: Date.now()
-      })
-    });
+// First, reset the project state to empty
+fetch('http://localhost:8787/api/framework/reset-project-state')
+  .then(response => response.json())
+  .then(data => {
+    console.log('Project state reset:', data);
     
-    const result = await response.json();
-    
-    if (result.error) {
-      console.error('Error executing framework command:', result.error);
-      return null;
-    }
-    
-    return result.result.content[0].text;
-  } catch (error) {
-    console.error('Error executing framework command:', error);
-    return null;
-  }
-}
-
-// Call a direct framework tool command
-async function executeDirectFrameworkTool(toolName, params = {}) {
-  try {
-    const response = await fetch(MCP_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Mcp-Session-Id': SESSION_ID
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'mcp.execute',
-        params: {
-          name: toolName,
-          input: params
-        },
-        id: Date.now()
-      })
-    });
-    
-    const result = await response.json();
-    
-    if (result.error) {
-      console.error(`Error executing ${toolName}:`, result.error);
-      return null;
-    }
-    
-    return result.result.content[0].text;
-  } catch (error) {
-    console.error(`Error executing ${toolName}:`, error);
-    return null;
-  }
-}
-
-// Update dashboard data
-async function updateDashboardData(section, data) {
-  try {
-    const response = await fetch(MCP_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Mcp-Session-Id': SESSION_ID
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        method: 'mcp.execute',
-        params: {
-          name: 'update-dashboard-data',
-          input: {
-            section,
-            data
-          }
-        },
-        id: Date.now()
-      })
-    });
-    
-    const result = await response.json();
-    
-    if (result.error) {
-      console.error('Error updating dashboard data:', result.error);
-      return null;
-    }
-    
-    return result.result.content[0].text;
-  } catch (error) {
-    console.error('Error updating dashboard data:', error);
-    return null;
-  }
-}
-
-// Create a session
-async function createSession() {
-  try {
-    const response = await fetch(MCP_URL, {
+    // Create a session first
+    return fetch('http://localhost:8787/mcp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -139,172 +24,232 @@ async function createSession() {
         jsonrpc: '2.0',
         method: 'mcp.createSession',
         params: {},
-        id: Date.now()
+        id: 1
       })
     });
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Session created:', data);
     
-    const result = await response.json();
-    
-    if (result.error) {
-      console.error('Error creating session:', result.error);
-      return null;
+    if (!data.result || !data.result.sessionId) {
+      throw new Error('Failed to get session ID');
     }
     
-    return result.result.sessionId;
-  } catch (error) {
-    console.error('Error creating session:', error);
-    return null;
-  }
-}
+    // Store the session ID for all subsequent requests
+    const sessionId = data.result.sessionId;
+    console.log('Using session ID:', sessionId);
+    
+    // Now simulate an AI agent analyzing the project and populating state
+    return runWithSession(sessionId);
+  })
+  .catch(error => {
+    console.error('Error in test script:', error);
+  });
 
-// Update project progress
-async function updateProjectProgress(components = [], tasks = []) {
-  try {
-    const response = await fetch(MCP_URL, {
+// Run all API calls with the same session
+function runWithSession(sessionId) {
+  // First populate project state
+  return fetch('http://localhost:8787/mcp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'Mcp-Session-Id': sessionId
+    },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      method: 'mcp.submit',
+      params: {
+        input: 'Initialize project state',
+        tools: [{
+          name: 'initialize-project-state',
+          input: {
+            components: [
+              {
+                name: 'Core Framework',
+                status: 'completed',
+                progress: 100,
+                description: 'Basic framework structure with initialization system'
+              },
+              {
+                name: 'Rule Engine',
+                status: 'completed',
+                progress: 100,
+                description: 'Rule processing, loading, and execution mechanisms'
+              },
+              {
+                name: 'Agent Service',
+                status: 'in-progress',
+                progress: 75,
+                description: 'Agent request handling and response processing'
+              },
+              {
+                name: 'Monitoring System',
+                status: 'in-progress',
+                progress: 60,
+                description: 'Performance metrics collection and analysis'
+              }
+            ],
+            ruleSets: [
+              {
+                name: 'Core Agent Behavior',
+                status: 'active',
+                rules: ['Conciseness', 'Helpfulness', 'Accuracy'],
+                description: 'Fundamental agent behavior rules'
+              },
+              {
+                name: 'Enhancement Rules',
+                status: 'active',
+                rules: ['Code Formatting', 'Explanation Clarity'],
+                description: 'General enhancement rules'
+              }
+            ],
+            tasks: [
+              {
+                name: 'Implement Core Framework',
+                status: 'completed',
+                progress: 100,
+                description: 'Create the basic framework structure'
+              },
+              {
+                name: 'Create Rule Engine',
+                status: 'completed',
+                progress: 100,
+                description: 'Implement rule processing engine'
+              },
+              {
+                name: 'Develop Agent Communication',
+                status: 'in-progress',
+                progress: 75,
+                description: 'Create agent communication protocol'
+              },
+              {
+                name: 'Set Up Monitoring',
+                status: 'in-progress',
+                progress: 60,
+                description: 'Implement performance monitoring'
+              },
+              {
+                name: 'Add API Integration',
+                status: 'planned',
+                progress: 0,
+                description: 'Implement API connections'
+              }
+            ],
+            phases: [
+              {
+                id: 1,
+                name: 'Core Infrastructure Setup',
+                status: 'completed',
+                components: ['Core Framework'],
+                tasks: ['Implement Core Framework'],
+                description: 'Setting up the core infrastructure for the Agentic Framework'
+              },
+              {
+                id: 2,
+                name: 'Rule System Implementation',
+                status: 'completed',
+                components: ['Rule Engine'],
+                tasks: ['Create Rule Engine'],
+                description: 'Implementing the rule system and context management'
+              },
+              {
+                id: 3,
+                name: 'Agent Integration',
+                status: 'current',
+                components: ['Agent Service'],
+                tasks: ['Develop Agent Communication'],
+                description: 'Integrating agent services and creating API endpoints'
+              },
+              {
+                id: 4,
+                name: 'Monitoring & Optimization',
+                status: 'upcoming',
+                components: ['Monitoring System'],
+                tasks: ['Set Up Monitoring', 'Add API Integration'],
+                description: 'Optimizing performance and preparing for deployment'
+              }
+            ],
+            currentPhase: 3
+          }
+        }]
+      },
+      id: 2
+    })
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('AI Agent populated project state:', data);
+    
+    // Now add a custom section to the dashboard
+    return fetch('http://localhost:8787/mcp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Mcp-Session-Id': SESSION_ID
+        'Mcp-Session-Id': sessionId
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        method: 'mcp.execute',
+        method: 'mcp.submit',
         params: {
-          name: 'update-project-progress',
-          input: { components, tasks }
+          input: 'Update dashboard with custom analysis',
+          tools: [{
+            name: 'update-dashboard-data',
+            input: {
+              section: 'custom-analysis',
+              data: `## AI Agent Project Analysis
+
+Based on my examination of the codebase, I've identified several key implementation patterns:
+
+1. The project uses a modular architecture with clear separation of concerns
+2. The rule system is well-designed but could benefit from additional rule categories
+3. Agent communication appears robust but needs additional error handling
+4. Monitoring is partially implemented with good foundational metrics collection
+
+**Recommendations**:
+- Enhance error handling in agent communication flows
+- Add more comprehensive monitoring for rule execution
+- Consider implementing a caching layer for improved performance`
+            }
+          }]
         },
-        id: Date.now()
+        id: 3
       })
     });
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Added custom dashboard section:', data);
     
-    const result = await response.json();
-    
-    if (result.error) {
-      console.error('Error updating project progress:', result.error);
-      return null;
-    }
-    
-    return result.result.content[0].text;
-  } catch (error) {
-    console.error('Error updating project progress:', error);
-    return null;
-  }
-}
-
-// Start dashboard via dashboard tool
-async function startDashboard() {
-  try {
-    const response = await fetch(MCP_URL, {
+    // Display final dashboard
+    return fetch('http://localhost:8787/mcp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'Mcp-Session-Id': SESSION_ID
+        'Mcp-Session-Id': sessionId
       },
       body: JSON.stringify({
         jsonrpc: '2.0',
-        method: 'mcp.execute',
+        method: 'mcp.submit',
         params: {
-          name: 'dashboard',
-          input: { random_string: 'dashboard' }
+          input: 'Update dashboard',
+          tools: [{
+            name: 'dashboard-update',
+            input: {
+              random_string: 'update'
+            }
+          }]
         },
-        id: Date.now()
+        id: 4
       })
     });
-    
-    const result = await response.json();
-    
-    if (result.error) {
-      console.error('Error starting dashboard:', result.error);
-      return null;
-    }
-    
-    console.log('Dashboard started successfully');
-    return true;
-  } catch (error) {
-    console.error('Error starting dashboard:', error);
-    return null;
-  }
-}
-
-// Test direct framework tool commands
-async function testDirectFrameworkTools() {
-  console.log('\nTesting direct framework tool commands...');
-  
-  // Test framework status direct tool
-  console.log('\nGetting framework status using direct tool...');
-  const statusResult = await executeDirectFrameworkTool('framework-status');
-  console.log(statusResult);
-  
-  // Test framework help direct tool
-  console.log('\nGetting framework help using direct tool...');
-  const helpResult = await executeDirectFrameworkTool('framework-help');
-  console.log(helpResult);
-  
-  // Test list rule sets direct tool
-  console.log('\nListing rule sets using direct tool...');
-  const listResult = await executeDirectFrameworkTool('list-rule-sets');
-  console.log(listResult);
-  
-  // Generate a project report
-  console.log('\nGenerating project report using direct tool...');
-  const reportResult = await executeDirectFrameworkTool('generate-project-report');
-  console.log(reportResult);
-  
-  return true;
-}
-
-// Main function to run tests
-async function main() {
-  // Create a session first
-  console.log('Creating session...');
-  const sessionId = await createSession();
-  console.log('Session created:', sessionId);
-  
-  // Start the dashboard
-  console.log('Starting dashboard...');
-  await startDashboard();
-  
-  // Test framework commands
-  console.log('\nTesting framework commands...');
-  
-  // Test framework status command
-  console.log('\nGetting framework status...');
-  const statusResult = await executeFrameworkCommand('status');
-  console.log(statusResult);
-  
-  // Test updating project progress
-  console.log('\nUpdating project progress...');
-  const components = [
-    { name: 'API System', progress: 70 }
-  ];
-  const tasks = [
-    { name: 'Implement REST API endpoints', progress: 70 },
-    { name: 'Add WebSocket support', progress: 40 },
-    { name: 'Complete API documentation', progress: 30 }
-  ];
-  const progressResult = await updateProjectProgress(components, tasks);
-  console.log(progressResult);
-  
-  // Test updating dashboard data
-  console.log('\nUpdating dashboard data...');
-  const agentNotes = 
-`* Dashboard now dynamically shows data from agents
-* API implementation is on track (70% complete)
-* WebSocket support is being implemented (40%)
-* Next milestone: Complete REST API endpoints by next week`;
-  
-  const dataResult = await updateDashboardData('agent-notes', agentNotes);
-  console.log(dataResult);
-  
-  // Test direct framework tool commands
-  await testDirectFrameworkTools();
-  
-  console.log('\nTests completed successfully');
-}
-
-// Run the tests
-main().catch(error => {
-  console.error('Error running tests:', error);
-}); 
+  })
+  .then(response => response.json())
+  .then(data => {
+    console.log('Final dashboard state:', data);
+    return data;
+  });
+} 
