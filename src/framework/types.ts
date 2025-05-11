@@ -52,9 +52,11 @@ export interface Metrics {
 export interface AgentRequest {
   id: string;
   sessionId: string;
-  userId: string;
-  command: string;
-  metadata: Record<string, any>;
+  content: string;
+  command?: string;
+  metadata?: {
+    [key: string]: any;
+  };
 }
 
 export interface AgentResponse {

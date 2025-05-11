@@ -43,6 +43,50 @@ npm install
 npm run dev
 ```
 
+## Integration with Cursor IDE
+
+To integrate the MCP Server with Cursor IDE, follow these steps:
+
+1. **Start the MCP Server**:
+   ```bash
+   npm run dev
+   ```
+
+2. **Create an MCP Session**:
+   ```bash
+   curl -X POST http://localhost:8787/mcp \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json" \
+     -d '{"jsonrpc":"2.0","method":"mcp.createSession","params":{},"id":1}'
+   ```
+   This will return a session ID that you'll need for subsequent requests.
+
+3. **Configure Cursor IDE**:
+   - Open Cursor IDE settings
+   - Navigate to the AI settings section
+   - Set the MCP endpoint to `http://localhost:8787/mcp`
+   - Add the session ID from step 2 to the configuration
+
+4. **Use Code Quality Analysis**:
+   The framework provides code quality analysis through the `analyzeCode` tool. You can test it with:
+   ```bash
+   curl -X POST http://localhost:8787/mcp \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
+     -H "Mcp-Session-Id: YOUR_SESSION_ID" \
+     -d '{"jsonrpc":"2.0","method":"mcp.submit","params":{"input":"Analyze this code","tools":[{"name":"analyzeCode","input":{"code":"function add(a, b) { return a+b; }","language":"javascript"}}]},"id":2}'
+   ```
+
+5. **Framework Commands**:
+   You can use framework commands through the MCP protocol:
+   ```bash
+   curl -X POST http://localhost:8787/mcp \
+     -H "Content-Type: application/json" \
+     -H "Accept: application/json, text/event-stream" \
+     -H "Mcp-Session-Id: YOUR_SESSION_ID" \
+     -d '{"jsonrpc":"2.0","method":"mcp.submit","params":{"input":"Check framework status","tools":[{"name":"framework","input":{"command":"status","args":[]}}]},"id":3}'
+   ```
+
 ## API Endpoints
 
 ### Framework Management

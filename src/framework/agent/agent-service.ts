@@ -3,6 +3,7 @@
  */
 
 import { AgentRequest, AgentResponse, Feedback } from '../types';
+import * as ruleEngine from '../rule-engine/rule-engine';
 
 /**
  * Process a request through the agent
@@ -27,10 +28,33 @@ export async function processRequest(env: any, request: AgentRequest): Promise<A
     await updateContext(env, context);
     
     // Process request
+    let responseContent = `Processed command: ${request.command}`;
+    
+    // Check if this is a code quality request
+    if (request.metadata?.type === 'code-quality') {
+      try {
+        // Make sure code quality rules are loaded
+        await ruleEngine.loadRuleSet(env, 'code-quality-development');
+        
+        // Get the code from the request content
+        const code = request.content;
+        const language = request.metadata?.language || 'javascript';
+        
+        // Analyze code quality
+        const qualityAnalysis = await analyzeCodeQuality(code, language);
+        
+        if (qualityAnalysis) {
+          responseContent = qualityAnalysis;
+        }
+      } catch (error) {
+        console.error('Error analyzing code quality:', error);
+      }
+    }
+    
     const response: AgentResponse = {
       id: `resp_${Date.now()}`,
       requestId: request.id,
-      content: `Processed command: ${request.command}`,
+      content: responseContent,
     };
     
     // Record response in context
@@ -57,6 +81,65 @@ export async function processRequest(env: any, request: AgentRequest): Promise<A
       requestId: request.id,
       content: `Error processing request: ${error instanceof Error ? error.message : String(error)}`,
     };
+  }
+}
+
+/**
+ * Analyze code quality
+ */
+async function analyzeCodeQuality(code: string, language: string): Promise<string> {
+  try {
+    // Basic code quality checks
+    const findings = [];
+    let improvedCode = code;
+    
+    // Check for error handling
+    if (!code.includes('try') && !code.includes('catch')) {
+      findings.push("⚠️ Error Handling: Missing proper error handling patterns");
+      improvedCode = `// Consider adding error handling\ntry {\n  ${code}\n} catch (error) {\n  // Handle errors appropriately\n  console.error(error);\n}`;
+    }
+    
+    // Check for security issues
+    if (code.includes('eval(') || code.includes('innerHTML =')) {
+      findings.push("🔒 Security: Potential security vulnerabilities detected");
+      improvedCode = improvedCode.replace(/eval\s*\(/g, '/* Security risk: avoid eval */ (');
+      improvedCode = improvedCode.replace(/\.innerHTML\s*=/g, '/* Security risk: use textContent instead */ .textContent =');
+    }
+    
+    // Check for performance issues
+    if (code.includes('for (') && code.includes('.concat(')) {
+      findings.push("⚡ Performance: Performance optimization opportunities identified");
+      improvedCode = improvedCode.replace(/\.concat\(/g, '/* Performance: consider using push instead */ .push(');
+    }
+    
+    // Check for testability
+    if (code.includes('document.') || code.includes('window.')) {
+      findings.push("🧪 Testability: Code could be improved for better testability");
+      improvedCode = `// Consider dependency injection for better testability\n${improvedCode}`;
+    }
+    
+    // Check for maintainability
+    const lines = code.split('\n');
+    if (lines.length > 10 || code.length > 200) {
+      findings.push("🔧 Maintainability: Code maintainability issues detected");
+      improvedCode = `// Consider breaking down into smaller functions\n${improvedCode}`;
+    }
+    
+    // Generate response
+    if (findings.length > 0) {
+      let response = "## Code Quality Analysis\n\n";
+      response += findings.join("\n");
+      response += "\n\n### Improved Code\n\n";
+      response += "```" + language + "\n";
+      response += improvedCode;
+      response += "\n```";
+      return response;
+    } else {
+      return "## Code Quality Analysis\n\n✅ No quality issues detected in the provided code.";
+    }
+  } catch (error) {
+    console.error('Error in code quality analysis:', error);
+    return "Error analyzing code quality.";
   }
 }
 

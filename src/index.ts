@@ -7,6 +7,8 @@ import { Router } from "itty-router";
 import * as initSystem from "./framework/core/init-system";
 import * as frameworkCommands from "./framework/core/framework-commands";
 import * as frameworkApi from "./framework/api/framework-api";
+import * as agentService from "./framework/agent/agent-service";
+import * as ruleEngine from "./framework/rule-engine/rule-engine";
 
 // Store env globally for framework access
 let globalEnv: Env;
@@ -21,6 +23,44 @@ export class MyMCP extends McpAgent {
 	async init() {
 		// Initialize the Agentic Framework
 		await initSystem.initializeFramework(globalEnv);
+
+		// Code quality analysis tool
+		this.server.tool(
+			"analyzeCode",
+			{
+				code: z.string().describe("The code to analyze"),
+				language: z.string().default("javascript").describe("The programming language of the code"),
+			},
+			async ({ code, language }) => {
+				try {
+					// Make sure code quality rules are loaded
+					await ruleEngine.loadRuleSet(globalEnv, 'code-quality-development');
+					
+					// Create a request for the agent service
+					const request = {
+						id: `code_analysis_${Date.now()}`,
+						sessionId: 'mcp_session',
+						content: code,
+						metadata: {
+							type: 'code-quality',
+							language
+						}
+					};
+					
+					// Process the request
+					const response = await agentService.processRequest(globalEnv, request);
+					
+					return {
+						content: [{ type: "text", text: response.content }],
+					};
+				} catch (error) {
+					console.error('Error analyzing code:', error);
+					return {
+						content: [{ type: "text", text: `Error analyzing code: ${error instanceof Error ? error.message : String(error)}` }],
+					};
+				}
+			}
+		);
 
 		// Basic calculator tools
 		this.server.tool(
@@ -102,8 +142,75 @@ router.all('*', (request, env, ctx) => {
 	}
 
 	if (url.pathname === "/mcp") {
+		// Create MCP handler with proper headers handling
+		const mcpHandler = MyMCP.serve("/mcp");
+		
+		// Check if this is a session creation request
+		if (request.method === 'POST') {
+			// Handle the request asynchronously
+			return (async () => {
+				// Clone the request to read the body
+				const requestClone = request.clone();
+				
+				try {
+					// Try to parse the JSON body
+					const body = await requestClone.json() as { 
+						method: string; 
+						id: string | number;
+						params?: { sessionId?: string } 
+					};
+					
+					if (body.method === 'mcp.createSession') {
+						// Generate a session ID
+						const sessionId = `session_${Date.now()}`;
+						
+						// Return a successful session creation response
+						return new Response(JSON.stringify({
+							jsonrpc: '2.0',
+							result: { sessionId },
+							id: body.id
+						}), {
+							headers: {
+								'Content-Type': 'application/json',
+								'Mcp-Session-Id': sessionId
+							}
+						});
+					}
+					
+					// For other MCP requests
+					const clonedRequest = new Request(request.url, {
+						method: request.method,
+						headers: new Headers(request.headers),
+						body: JSON.stringify(body),
+						redirect: request.redirect,
+					});
+					
+					// Add the required headers
+					clonedRequest.headers.set('Accept', 'application/json, text/event-stream');
+					
+					// Add the session ID header if missing
+					if (!clonedRequest.headers.has('Mcp-Session-Id') && body.params?.sessionId) {
+						clonedRequest.headers.set('Mcp-Session-Id', body.params.sessionId);
+					}
+					
+					// @ts-ignore
+					return mcpHandler.fetch(clonedRequest, env, ctx);
+				} catch (error) {
+					console.error('Error parsing JSON:', error);
+					return new Response(JSON.stringify({
+						jsonrpc: '2.0',
+						error: { code: -32700, message: 'Parse error: Invalid JSON' },
+						id: null
+					}), {
+						status: 400,
+						headers: { 'Content-Type': 'application/json' }
+					});
+				}
+			})();
+		}
+		
 		// @ts-ignore
-		return MyMCP.serve("/mcp").fetch(request, env, ctx);
+		return mcpHandler.fetch(request, env, ctx);
 	}
 
 	// Return 404 for unknown routes
