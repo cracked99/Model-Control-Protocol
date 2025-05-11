@@ -62,10 +62,24 @@ To integrate the MCP Server with Cursor IDE, follow these steps:
    This will return a session ID that you'll need for subsequent requests.
 
 3. **Configure Cursor IDE**:
-   - Open Cursor IDE settings
-   - Navigate to the AI settings section
-   - Set the MCP endpoint to `http://localhost:8787/mcp`
-   - Add the session ID from step 2 to the configuration
+   - Open Cursor IDE
+   - Go to Settings:
+     - On Windows/Linux: File > Settings
+     - On macOS: Cursor > Settings
+   - Navigate to the AI settings section:
+     - Search for "Model Context Protocol" or "MCP"
+   - Configure the MCP settings:
+     - **MCP Endpoint**: `http://localhost:8787/mcp`
+     - **Session ID**: Paste the session ID you received in Step 2
+     - **Enable MCP**: Check this option
+
+     Alternatively, you can use the provided `mcp.json` file:
+     - In Cursor IDE, go to Settings > AI > Model Context Protocol
+     - Click "Import Configuration"
+     - Select the `mcp.json` file from this repository
+     - The configuration will be automatically loaded
+     - You'll still need to add your session ID manually
+   - Save the settings
 
 4. **Use Code Quality Analysis**:
    The framework provides code quality analysis through the `analyzeCode` tool. You can test it with:
