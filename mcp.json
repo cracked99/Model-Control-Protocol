@@ -1,0 +1,69 @@
+{
+  "version": "1.0.0",
+  "name": "Agentic Framework MCP Server",
+  "description": "A comprehensive system designed to enhance AI agent capabilities through rule-based processing, monitoring, and context management",
+  "endpoint": "http://localhost:8787/mcp",
+  "tools": [
+    {
+      "name": "analyzeCode",
+      "description": "Analyzes code for quality issues and suggests improvements",
+      "parameters": {
+        "code": {
+          "type": "string",
+          "description": "The code to analyze"
+        },
+        "language": {
+          "type": "string",
+          "description": "The programming language of the code",
+          "default": "javascript"
+        }
+      }
+    },
+    {
+      "name": "framework",
+      "description": "Execute framework commands",
+      "parameters": {
+        "command": {
+          "type": "string",
+          "description": "The framework command to run",
+          "enum": ["status", "help", "load", "unload", "reload", "list", "reset"]
+        },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Optional arguments for the command"
+        }
+      }
+    },
+    {
+      "name": "calculate",
+      "description": "Perform basic calculations",
+      "parameters": {
+        "operation": {
+          "type": "string",
+          "description": "The operation to perform",
+          "enum": ["add", "subtract", "multiply", "divide"]
+        },
+        "a": {
+          "type": "number",
+          "description": "First operand"
+        },
+        "b": {
+          "type": "number",
+          "description": "Second operand"
+        }
+      }
+    }
+  ],
+  "authentication": {
+    "type": "header",
+    "headerName": "Mcp-Session-Id",
+    "description": "Session ID obtained from creating a session with the MCP server"
+  },
+  "documentation": {
+    "setup": "See README.md for setup instructions",
+    "usage": "Use the analyzeCode tool to analyze code quality, and the framework tool to interact with the Agentic Framework"
+  }
+} 
