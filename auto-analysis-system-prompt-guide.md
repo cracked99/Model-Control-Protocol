@@ -6,6 +6,29 @@ This guide explains how the Cursor AI system prompt automatically analyzes and u
 
 The system prompt has been enhanced to automatically call the `analyze-and-update-project-state` tool in specific scenarios, ensuring the dashboard always reflects an accurate representation of the project.
 
+## Automatic State Reset
+
+The framework now automatically resets the project state when a new chat session begins:
+
+1. **Fresh Start**: Each new conversation begins with an empty project state to ensure consistency
+2. **Automatic Analysis**: Shortly after the reset, auto-analysis runs to populate the state with current information
+3. **Session Persistence**: Project state changes persist only during the current chat session
+4. **Configurable Behavior**: The auto-analysis after reset can be disabled via the settings API
+
+To control automatic reset behavior, use the settings API:
+
+```
+// Disable auto-analysis after reset
+curl -X POST http://localhost:8787/api/framework/settings \
+  -H "Content-Type: application/json" \
+  -d '{"autoReset":{"skipAutoAnalysis":true}}'
+
+// Re-enable auto-analysis after reset
+curl -X POST http://localhost:8787/api/framework/settings \
+  -H "Content-Type: application/json" \
+  -d '{"autoReset":{"skipAutoAnalysis":false}}'
+```
+
 ## Key System Prompt Additions
 
 The following functionality has been added to the Cursor AI system prompt:
@@ -66,10 +89,11 @@ The system prompt will automatically trigger project analysis when:
 
 You can test this functionality by:
 
-1. Resetting the project state: `/api/framework/reset-project-state`
-2. Starting a new conversation with Cursor AI
-3. Asking about the project structure
-4. Observing the dashboard getting populated automatically
+1. Starting a new conversation with Cursor AI (automatic reset happens)
+2. Asking about the project structure
+3. Observing the dashboard getting populated automatically
+4. Making changes to the project state during your session
+5. Starting a new session and seeing that it resets to a fresh state
 
 ## Customizing The Analysis Behavior
 
@@ -78,6 +102,7 @@ To customize how analysis occurs:
 1. Edit `agentic-framework-system-prompt.md` to modify when analysis is triggered
 2. Modify `system-prompt-addition.txt` for a minimal instruction set
 3. Edit `index.ts` in the MCP server if you need to change how the tool functions
+4. Use the settings API to control auto-analysis after reset
 
 ## Benefits of Automatic Analysis
 
@@ -85,4 +110,5 @@ To customize how analysis occurs:
 - No manual intervention needed to keep project state accurate
 - AI responses about the project are more accurate because they're based on fresh analysis
 - Transitions between conversations maintain project context
-- Progress updates work even on an empty project state 
+- Progress updates work even on an empty project state
+- Each new conversation starts fresh with current information 

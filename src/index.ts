@@ -856,6 +856,64 @@ router.all('*', (request, env, ctx) => {
 						// Generate a session ID
 						const sessionId = `session_${Date.now()}`;
 						
+						// Auto-reset project state when a new session is created
+						try {
+							console.log('Auto-resetting project state for new chat session...');
+							
+							// Import the necessary modules
+							const { updateProjectState } = await import('./framework/core/project-state');
+							const projectAnalyzer = await import('./framework/core/project-analyzer');
+							
+							// Create an empty project state
+							const emptyState = {
+								components: [],
+								ruleSets: [],
+								tasks: [],
+								phases: [],
+								currentPhase: 0,
+								lastUpdated: Date.now()
+							};
+							
+							// Reset the state
+							await updateProjectState(globalEnv, emptyState);
+							
+							// Flag to track whether auto-analysis should be run
+							let shouldAutoAnalyze = true;
+							
+							// Get auto-reset preferences from KV storage
+							try {
+								const autoResetPrefs = await globalEnv.FRAMEWORK_KV?.get('settings:auto_reset', { type: 'json' }) as { skipAutoAnalysis?: boolean } | null;
+								if (autoResetPrefs && autoResetPrefs.skipAutoAnalysis) {
+									shouldAutoAnalyze = false;
+								}
+							} catch (prefError) {
+								console.error('Error getting auto-reset preferences:', prefError);
+							}
+							
+							// Trigger auto-analysis after reset (in background)
+							if (shouldAutoAnalyze) {
+								console.log('Running auto-analysis after state reset...');
+								setTimeout(async () => {
+									try {
+										// Run analysis and update state
+										await projectAnalyzer.analyzeAndUpdateProjectState(globalEnv);
+										
+										// Refresh dashboard if active
+										if (dashboardActive) {
+											await agentService.refreshDashboard(globalEnv);
+										}
+										
+										console.log('Auto-analysis completed for new session');
+									} catch (analysisError) {
+										console.error('Error during auto-analysis:', analysisError);
+									}
+								}, 500); // Small delay to ensure reset completes first
+							}
+						} catch (resetError) {
+							console.error('Error auto-resetting project state:', resetError);
+							// Continue with session creation even if reset fails
+						}
+						
 						// Return a successful session creation response
 						return new Response(JSON.stringify({
 							jsonrpc: '2.0',

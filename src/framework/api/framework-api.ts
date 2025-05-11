@@ -24,35 +24,43 @@ export async function handleRequest(request: Request, env: any): Promise<Respons
     const url = new URL(request.url);
     const path = url.pathname;
     
-    // Framework API routes
+    // Route to appropriate handler based on path
     if (path === '/api/framework/initialize') {
       return handleInitializeRequest(request, env);
     } else if (path === '/api/framework/status') {
       return handleStatusRequest(request, env);
-    } else if (path === '/api/framework/rules/load') {
+    } else if (path === '/api/framework/metrics') {
+      return handleMetricsRequest(request, env);
+    } else if (path === '/api/framework/load') {
       return handleLoadRulesRequest(request, env);
-    } else if (path === '/api/framework/rules/unload') {
+    } else if (path === '/api/framework/unload') {
       return handleUnloadRulesRequest(request, env);
-    } else if (path === '/api/framework/rules/list') {
+    } else if (path === '/api/framework/list') {
       return handleListRulesRequest(request, env);
     } else if (path === '/api/framework/reset') {
       return handleResetRequest(request, env);
     } else if (path === '/api/framework/reset-project-state') {
       return handleResetProjectStateRequest(request, env);
-    } else if (path === '/api/agent/process') {
+    } else if (path === '/api/framework/process') {
       return handleProcessRequest(request, env);
-    } else if (path === '/api/agent/context') {
+    } else if (path === '/api/framework/context') {
       return handleContextRequest(request, env);
-    } else if (path === '/api/monitoring/metrics') {
-      return handleMetricsRequest(request, env);
-    } else if (path === '/api/agent/feedback') {
+    } else if (path === '/api/framework/feedback') {
       return handleFeedbackRequest(request, env);
-    } else if (path === '/api/agent/feedback/analysis') {
+    } else if (path === '/api/framework/feedback-analysis') {
       return handleFeedbackAnalysisRequest(request, env);
+    } else if (path === '/api/framework/settings') {
+      return handleSettingsRequest(request, env);
+    } else if (path.startsWith('/api/agent/')) {
+      // Agent API endpoints
+      return handleAgentRequest(request, env);
+    } else if (path.startsWith('/api/monitoring/')) {
+      // Monitoring API endpoints
+      return handleMonitoringRequest(request, env);
+    } else {
+      // Unknown endpoint
+      return createErrorResponse(`Endpoint not found: ${path}`, null, 404);
     }
-    
-    // If no route matches, return 404
-    return createJsonResponse({ error: 'Not Found' }, 404);
   } catch (error) {
     console.error('Error handling API request:', error);
     return createErrorResponse('Internal server error', error, 500);
@@ -455,6 +463,106 @@ async function handleResetProjectStateRequest(request: Request, env: any): Promi
   } catch (error) {
     console.error('Error resetting project state:', error);
     return createErrorResponse('Error resetting project state', error);
+  }
+}
+
+/**
+ * Handle settings request
+ */
+async function handleSettingsRequest(request: Request, env: any): Promise<Response> {
+  try {
+    if (request.method === 'GET') {
+      // Get settings
+      const autoResetPrefs = await env.FRAMEWORK_KV?.get('settings:auto_reset', { type: 'json' }) as { skipAutoAnalysis?: boolean } | null;
+      
+      return createJsonResponse({
+        status: 'success',
+        data: {
+          autoReset: {
+            skipAutoAnalysis: autoResetPrefs?.skipAutoAnalysis || false
+          }
+        }
+      });
+    } else if (request.method === 'POST') {
+      // Update settings
+      const body = await request.json() as { 
+        autoReset?: {
+          skipAutoAnalysis?: boolean
+        }
+      };
+      
+      // Get current settings
+      const currentSettings = await env.FRAMEWORK_KV?.get('settings:auto_reset', { type: 'json' }) as Record<string, any> || {};
+      
+      // Update auto-reset settings if provided
+      if (body.autoReset) {
+        const autoResetSettings = {
+          ...currentSettings,
+          ...body.autoReset
+        };
+        
+        // Store updated settings
+        await env.FRAMEWORK_KV?.put('settings:auto_reset', JSON.stringify(autoResetSettings));
+      }
+      
+      return createJsonResponse({
+        status: 'success',
+        message: 'Settings updated successfully'
+      });
+    } else {
+      return createErrorResponse('Method not allowed', null, 405);
+    }
+  } catch (error) {
+    console.error('Error handling settings request:', error);
+    return createErrorResponse('Error handling settings request', error);
+  }
+}
+
+/**
+ * Handle agent requests
+ */
+async function handleAgentRequest(request: Request, env: any): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    
+    // Process agent APIs
+    if (path === '/api/agent/process') {
+      return handleProcessRequest(request, env);
+    } else if (path === '/api/agent/context') {
+      return handleContextRequest(request, env);
+    } else if (path === '/api/agent/feedback') {
+      return handleFeedbackRequest(request, env);
+    } else if (path === '/api/agent/feedback/analysis') {
+      return handleFeedbackAnalysisRequest(request, env);
+    } 
+    
+    // Unknown agent endpoint
+    return createErrorResponse(`Agent endpoint not found: ${path}`, null, 404);
+  } catch (error) {
+    console.error('Error handling agent request:', error);
+    return createErrorResponse('Error handling agent request', error);
+  }
+}
+
+/**
+ * Handle monitoring requests
+ */
+async function handleMonitoringRequest(request: Request, env: any): Promise<Response> {
+  try {
+    const url = new URL(request.url);
+    const path = url.pathname;
+    
+    // Process monitoring APIs
+    if (path === '/api/monitoring/metrics') {
+      return handleMetricsRequest(request, env);
+    } 
+    
+    // Unknown monitoring endpoint
+    return createErrorResponse(`Monitoring endpoint not found: ${path}`, null, 404);
+  } catch (error) {
+    console.error('Error handling monitoring request:', error);
+    return createErrorResponse('Error handling monitoring request', error);
   }
 }
 

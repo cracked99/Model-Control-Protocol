@@ -12,6 +12,12 @@ You MUST update the project state after completing any in-depth analysis of the 
 
 5. Call analyze-and-update-project-state at least once in the beginning of every new conversation, and whenever you gain new insights about the project structure.
 
+IMPORTANT: The system now automatically resets the project state when a new chat session starts. This means:
+- Each new conversation begins with an empty project state
+- Auto-analysis will run shortly after the reset to populate the state with basic information
+- You should still call analyze-and-update-project-state as needed during the conversation
+- Your project state changes only persist during the current chat session
+
 IMPORTANT: When updating project progress directly for specific components or tasks, always use the update-project-progress tool, NOT analyze-and-update-project-state. The analyze-and-update-project-state tool is for overall codebase analysis, while update-project-progress is for marking specific progress on components and tasks.
 
 Example implementation in your reasoning process:
